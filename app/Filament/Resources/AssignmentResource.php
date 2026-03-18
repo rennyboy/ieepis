@@ -10,53 +10,110 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class AssignmentResource extends Resource
 {
     protected static ?string $model = EquipmentAssignment::class;
-    protected static ?string $navigationIcon = 'heroicon-o-link';
-    protected static ?string $navigationGroup = 'ICT Inventory';
+    protected static ?string $navigationIcon = "heroicon-o-link";
+    protected static ?string $navigationGroup = "ICT Inventory";
     protected static ?int $navigationSort = 4;
-    protected static ?string $navigationLabel = 'Assignments';
+    protected static ?string $navigationLabel = "Assignments";
 
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\Section::make('Assignment Details')->schema([
-                Forms\Components\Select::make('equipment_id')
-                    ->label('Equipment')
-                    ->relationship('equipment', 'model',
-                        fn ($query) => $query->where('accountability_status', 'unassigned')
-                    )
-                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->brand} {$record->model} ({$record->property_no})")
-                    ->searchable()->preload()->required(),
-                Forms\Components\Select::make('employee_id')
-                    ->label('Accountable Officer')
-                    ->relationship('employee', 'full_name', fn ($query) => $query->where('status', 'active'))
-                    ->searchable()->preload()->required(),
-                Forms\Components\Select::make('custodian_id')
-                    ->label('Custodian / End User (if different)')
-                    ->relationship('custodian', 'full_name', fn ($query) => $query->where('status', 'active'))
-                    ->searchable()->preload()->nullable(),
-                Forms\Components\Select::make('transaction_type')
-                    ->options([
-                        'Beginning Inventory' => 'Beginning Inventory',
-                        'Issuance'            => 'Issuance',
-                        'Transfer'            => 'Transfer',
-                        'Return'              => 'Return',
-                    ])->required()->default('Issuance'),
-                Forms\Components\Select::make('supporting_doc_type')
-                    ->label('Supporting Document Type')
-                    ->options(['PAR' => 'PAR', 'ICS' => 'ICS', 'RRSP' => 'RRSP', 'RRPE' => 'RRPE']),
-                Forms\Components\TextInput::make('supporting_doc_no')->label('Document No.'),
-                Forms\Components\DatePicker::make('assigned_at')->label('Date Assigned')->required()->default(now()),
-                Forms\Components\DatePicker::make('custodian_received_at')->label('Date Received by Custodian'),
-                Forms\Components\TextInput::make('assigned_by')->label('Assigned By')->required(),
-                Forms\Components\Textarea::make('notes')->rows(3)->columnSpanFull(),
-            ])->columns(2),
+            Forms\Components\Section::make("Assignment Details")
+                ->schema([
+                    Forms\Components\Select::make("school_id")
+                        ->label("School")
+                        ->relationship("school", "name")
+                        ->disabled(
+                            fn() => !Auth::user()->hasRole("super-admin"),
+                        )
+                        ->default(fn() => Auth::user()->school_id)
+                        ->searchable()
+                        ->preload()
+                        ->required(),
+                    Forms\Components\Select::make("equipment_id")
+                        ->label("Equipment")
+                        ->relationship(
+                            "equipment",
+                            "model",
+                            fn($query) => $query->where(
+                                "accountability_status",
+                                "unassigned",
+                            ),
+                        )
+                        ->getOptionLabelFromRecordUsing(
+                            fn(
+                                $record,
+                            ) => "{$record->brand} {$record->model} ({$record->property_no})",
+                        )
+                        ->searchable()
+                        ->preload()
+                        ->required(),
+                    Forms\Components\Select::make("employee_id")
+                        ->label("Accountable Officer")
+                        ->relationship(
+                            "employee",
+                            "full_name",
+                            fn($query) => $query->where("status", "active"),
+                        )
+                        ->searchable()
+                        ->preload()
+                        ->required(),
+                    Forms\Components\Select::make("custodian_id")
+                        ->label("Custodian / End User (if different)")
+                        ->relationship(
+                            "custodian",
+                            "full_name",
+                            fn($query) => $query->where("status", "active"),
+                        )
+                        ->searchable()
+                        ->preload()
+                        ->nullable(),
+                    Forms\Components\Select::make("transaction_type")
+                        ->options([
+                            "Beginning Inventory" => "Beginning Inventory",
+                            "Issuance" => "Issuance",
+                            "Transfer" => "Transfer",
+                            "Return" => "Return",
+                        ])
+                        ->required()
+                        ->default("Issuance"),
+                    Forms\Components\Select::make("supporting_doc_type")
+                        ->label("Supporting Document Type")
+                        ->options([
+                            "PAR" => "PAR",
+                            "ICS" => "ICS",
+                            "RRSP" => "RRSP",
+                            "RRPE" => "RRPE",
+                        ]),
+                    Forms\Components\TextInput::make(
+                        "supporting_doc_no",
+                    )->label("Document No."),
+                    Forms\Components\DatePicker::make("assigned_at")
+                        ->label("Date Assigned")
+                        ->required()
+                        ->default(now()),
+                    Forms\Components\DatePicker::make(
+                        "custodian_received_at",
+                    )->label("Date Received by Custodian"),
+                    Forms\Components\TextInput::make("assigned_by")
+                        ->label("Assigned By")
+                        ->required(),
+                    Forms\Components\Textarea::make("notes")
+                        ->rows(3)
+                        ->columnSpanFull(),
+                ])
+                ->columns(2),
 
-            Forms\Components\Section::make('Return Details')->schema([
-                Forms\Components\DatePicker::make('returned_at')->label('Date Returned (leave blank if still active)'),
+            Forms\Components\Section::make("Return Details")->schema([
+                Forms\Components\DatePicker::make("returned_at")->label(
+                    "Date Returned (leave blank if still active)",
+                ),
             ]),
         ]);
     }
@@ -65,39 +122,100 @@ class AssignmentResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('equipment.property_no')->label('Property No.')
-                    ->fontFamily('mono')->color('primary')->searchable(),
-                Tables\Columns\TextColumn::make('equipment.brand')->label('Brand'),
-                Tables\Columns\TextColumn::make('equipment.model')->label('Model')->weight('bold'),
-                Tables\Columns\TextColumn::make('employee.full_name')->label('Accountable Officer')->searchable(),
-                Tables\Columns\TextColumn::make('custodian.full_name')->label('Custodian'),
-                Tables\Columns\TextColumn::make('transaction_type')->label('Transaction')->badge()->color('info'),
-                Tables\Columns\TextColumn::make('supporting_doc_type')->label('Doc Type')->badge()->color('gray'),
-                Tables\Columns\TextColumn::make('supporting_doc_no')->label('Doc No.'),
-                Tables\Columns\TextColumn::make('assigned_at')->label('Assigned')->date()->sortable(),
-                Tables\Columns\TextColumn::make('returned_at')->label('Returned')->date(),
-                Tables\Columns\IconColumn::make('is_active')->label('Active')
+                Tables\Columns\TextColumn::make("school.name")
+                    ->label("School")
+                    ->sortable()
+                    ->searchable(),
+                Tables\Columns\TextColumn::make("equipment.property_no")
+                    ->label("Property No.")
+                    ->fontFamily("mono")
+                    ->color("primary")
+                    ->searchable(),
+                Tables\Columns\TextColumn::make("equipment.brand")->label(
+                    "Brand",
+                ),
+                Tables\Columns\TextColumn::make("equipment.model")
+                    ->label("Model")
+                    ->weight("bold"),
+                Tables\Columns\TextColumn::make("employee.full_name")
+                    ->label("Accountable Officer")
+                    ->searchable(),
+                Tables\Columns\TextColumn::make("custodian.full_name")->label(
+                    "Custodian",
+                ),
+                Tables\Columns\TextColumn::make("transaction_type")
+                    ->label("Transaction")
+                    ->badge()
+                    ->color("info"),
+                Tables\Columns\TextColumn::make("supporting_doc_type")
+                    ->label("Doc Type")
+                    ->badge()
+                    ->color("gray"),
+                Tables\Columns\TextColumn::make("supporting_doc_no")->label(
+                    "Doc No.",
+                ),
+                Tables\Columns\TextColumn::make("assigned_at")
+                    ->label("Assigned")
+                    ->date()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make("returned_at")
+                    ->label("Returned")
+                    ->date(),
+                Tables\Columns\IconColumn::make("is_active")
+                    ->label("Active")
                     ->boolean()
-                    ->getStateUsing(fn (EquipmentAssignment $r) => is_null($r->returned_at)),
+                    ->getStateUsing(
+                        fn(EquipmentAssignment $r) => is_null($r->returned_at),
+                    ),
             ])
             ->filters([
-                Tables\Filters\Filter::make('active_only')
-                    ->label('Active Only')
-                    ->query(fn ($query) => $query->whereNull('returned_at'))
+                Tables\Filters\Filter::make("active_only")
+                    ->label("Active Only")
+                    ->query(fn($query) => $query->whereNull("returned_at"))
                     ->default(),
-                Tables\Filters\SelectFilter::make('transaction_type')
-                    ->options(['Beginning Inventory' => 'Beginning Inventory', 'Issuance' => 'Issuance', 'Transfer' => 'Transfer', 'Return' => 'Return']),
+                Tables\Filters\SelectFilter::make("transaction_type")->options([
+                    "Beginning Inventory" => "Beginning Inventory",
+                    "Issuance" => "Issuance",
+                    "Transfer" => "Transfer",
+                    "Return" => "Return",
+                ]),
+                Tables\Filters\SelectFilter::make("school_id")
+                    ->label("School")
+                    ->relationship("school", "name")
+                    ->visible(fn() => Auth::user()->hasRole("super-admin")),
             ])
-            ->actions([Tables\Actions\ViewAction::make(), Tables\Actions\EditAction::make()])
-            ->defaultSort('assigned_at', 'desc');
+            ->actions([
+                Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make(),
+            ])
+            ->defaultSort("assigned_at", "desc");
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = Auth::user();
+
+        // Super admins can see all assignments
+        if ($user->hasRole("super-admin")) {
+            return $query;
+        }
+
+        // Other users can only see assignments from their school
+        if ($user->school_id) {
+            return $query->where("school_id", $user->school_id);
+        }
+
+        // Users with no school_id can't see anything
+        return $query->whereNull("school_id");
     }
 
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListAssignments::route('/'),
-            'create' => Pages\CreateAssignment::route('/create'),
-            'edit'   => Pages\EditAssignment::route('/{record}/edit'),
+            "index" => Pages\ListAssignments::route("/"),
+            "create" => Pages\CreateAssignment::route("/create"),
+            "edit" => Pages\EditAssignment::route("/{record}/edit"),
         ];
     }
 }
