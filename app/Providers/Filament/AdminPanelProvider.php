@@ -13,6 +13,7 @@ use App\Filament\Widgets\IEEPISStatsOverview;
 use App\Filament\Widgets\EquipmentBySchoolChart;
 use App\Filament\Widgets\EquipmentConditionChart;
 use App\Filament\Widgets\LatestTicketsWidget;
+use App\Filament\Widgets\NavbarUserWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -36,39 +37,51 @@ class AdminPanelProvider extends PanelProvider
     {
         return $panel
             ->default()
-            ->id('admin')
-            ->path('admin')
+            ->id("admin")
+            ->path("admin")
             ->login()
             ->colors([
-                'primary' => Color::Blue,
-                'danger'  => Color::Red,
-                'warning' => Color::Amber,
-                'success' => Color::Emerald,
-                'info'    => Color::Cyan,
-                'gray'    => Color::Slate,
+                "primary" => Color::Blue,
+                "danger" => Color::Red,
+                "warning" => Color::Amber,
+                "success" => Color::Emerald,
+                "info" => Color::Cyan,
+                "gray" => Color::Slate,
             ])
-            ->brandName('IEEPIS')
-            ->brandLogo(asset('images/ieepis-logo.png'))
-            ->favicon(asset('images/ieepis-favicon.png'))
-            ->sidebarCollapsibleOnDesktop()
+            ->brandName("IEEPIS")
+            ->brandLogo(asset("images/ieepis-logo.png"))
+            ->favicon(asset("images/ieepis-favicon.png"))
+            // ✅ Configure for full-width layout with vertical sidebar
+            ->sidebarCollapsibleOnDesktop(true)
+            ->topNavigation(false)
             ->navigationGroups([
-                NavigationGroup::make('Overview'),
-                NavigationGroup::make('Management')
-                    ->icon('heroicon-o-building-office'),
-                NavigationGroup::make('ICT Inventory')
-                    ->icon('heroicon-o-computer-desktop'),
-                NavigationGroup::make('Monitoring')
-                    ->icon('heroicon-o-chart-bar'),
-                NavigationGroup::make('Reports & Tools')
-                    ->icon('heroicon-o-document-chart-bar')
+                NavigationGroup::make("Overview"),
+                NavigationGroup::make("Management")->icon(
+                    "heroicon-o-building-office",
+                ),
+                NavigationGroup::make("ICT Inventory")->icon(
+                    "heroicon-o-computer-desktop",
+                ),
+                NavigationGroup::make("Monitoring")->icon(
+                    "heroicon-o-chart-bar",
+                ),
+                NavigationGroup::make("Reports & Tools")
+                    ->icon("heroicon-o-document-chart-bar")
                     ->collapsed(),
             ])
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
-            ->pages([
-                Pages\Dashboard::class,
-            ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
+            ->discoverResources(
+                in: app_path("Filament/Resources"),
+                for: "App\\Filament\\Resources",
+            )
+            ->discoverPages(
+                in: app_path("Filament/Pages"),
+                for: "App\\Filament\\Pages",
+            )
+            ->pages([Pages\Dashboard::class])
+            ->discoverWidgets(
+                in: app_path("Filament/Widgets"),
+                for: "App\\Filament\\Widgets",
+            )
             ->widgets([
                 IEEPISStatsOverview::class,
                 EquipmentBySchoolChart::class,
@@ -86,14 +99,24 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
-            ->authMiddleware([
-                Authenticate::class,
-            ])
+            ->authMiddleware([Authenticate::class])
             ->databaseNotifications()
             ->globalSearch()
-            ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
+            ->globalSearchKeyBindings(["command+k", "ctrl+k"])
             ->userMenuItems([
-                'profile' => \Filament\Navigation\MenuItem::make()->label('My Profile'),
-            ]);
+                "profile" => \Filament\Navigation\MenuItem::make()->label(
+                    "My Profile",
+                ),
+            ])
+            // ✅ Keep render hook for user info in minimal top bar
+            ->renderHook(
+                "panels::topbar.end",
+                fn() => view("filament.widgets.navbar-user-widget", [
+                    "userName" => auth()->user()?->name ?? "User",
+                    "userRole" =>
+                        auth()->user()?->getRoleNames()->first() ?? "User",
+                    "schoolName" => auth()->user()?->school?->name ?? null,
+                ]),
+            );
     }
 }

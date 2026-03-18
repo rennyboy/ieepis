@@ -2,9 +2,14 @@
 
 namespace App\Models;
 
+use App\Scopes\SchoolScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -14,64 +19,69 @@ class Equipment extends Model
     use HasFactory, SoftDeletes, LogsActivity;
 
     protected $fillable = [
-        'school_id',
-        'property_no',
-        'old_property_no',
-        'serial_number',
-        'item_type',         // Device Type / Equipment / Hardware / Software / Peripherals
-        'equipment_type',    // Laptop, Desktop, Printer, etc.
-        'brand',
-        'model',
-        'specifications',
-        'unit_of_measure',
-        'category',          // High-Value / Low-Value
-        'classification',    // Machinery and Equipment for ICT
-        'gl_sl_code',
-        'uacs_code',
-        'is_dcp',
-        'dcp_package',
-        'dcp_year',
-        'is_non_dcp',
-        'acquisition_cost',
-        'acquisition_date',
-        'received_date',
-        'estimated_useful_life',
-        'mode_of_acquisition', // Purchased / Donation / Grant
-        'source_of_acquisition',
-        'donor',
-        'source_of_funds',
-        'pmp_reference_no',
-        'supporting_doc_type_acquisition',
-        'supporting_doc_no_acquisition',
-        'supplier',
-        'under_warranty',
-        'warranty_end_date',
-        'equipment_location',
-        'is_functional',
-        'condition',         // Good / Fair / Poor
-        'accountability_status', // Normal / Transferred / Stolen / Lost / Damaged / For Disposal
-        'disposition_status',
-        'remarks',
-        'qr_code',
-        'transaction_type',
-        'supporting_doc_type_issuance',
-        'supporting_doc_no_issuance',
+        "school_id",
+        "property_no",
+        "old_property_no",
+        "serial_number",
+        "item_type",
+        "equipment_type",
+        "brand",
+        "model",
+        "specifications",
+        "unit_of_measure",
+        "category",
+        "classification",
+        "gl_sl_code",
+        "uacs_code",
+        "is_dcp",
+        "dcp_package",
+        "dcp_year",
+        "is_non_dcp",
+        "acquisition_cost",
+        "acquisition_date",
+        "received_date",
+        "estimated_useful_life",
+        "mode_of_acquisition",
+        "source_of_acquisition",
+        "donor",
+        "source_of_funds",
+        "pmp_reference_no",
+        "supporting_doc_type_acquisition",
+        "supporting_doc_no_acquisition",
+        "supplier",
+        "under_warranty",
+        "warranty_end_date",
+        "equipment_location",
+        "is_functional",
+        "condition",
+        "accountability_status",
+        "disposition_status",
+        "remarks",
+        "qr_code",
+        "transaction_type",
+        "supporting_doc_type_issuance",
+        "supporting_doc_no_issuance",
     ];
 
     protected $casts = [
-        'acquisition_date'     => 'date',
-        'received_date'        => 'date',
-        'warranty_end_date'    => 'date',
-        'acquisition_cost'     => 'decimal:2',
-        'is_dcp'               => 'boolean',
-        'is_non_dcp'           => 'boolean',
-        'under_warranty'       => 'boolean',
-        'is_functional'        => 'boolean',
+        "acquisition_date" => "date",
+        "received_date" => "date",
+        "warranty_end_date" => "date",
+        "acquisition_cost" => "decimal:2",
+        "is_dcp" => "boolean",
+        "is_non_dcp" => "boolean",
+        "under_warranty" => "boolean",
+        "is_functional" => "boolean",
     ];
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logAll()->logOnlyDirty();
+    }
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope(new SchoolScope());
     }
 
     protected static function boot()
@@ -81,7 +91,7 @@ class Equipment extends Model
             $equipment->qr_code = self::generateQrPayload($equipment);
         });
         static::updating(function ($equipment) {
-            if ($equipment->isDirty(['property_no', 'serial_number'])) {
+            if ($equipment->isDirty(["property_no", "serial_number"])) {
                 $equipment->qr_code = self::generateQrPayload($equipment);
             }
         });
@@ -92,71 +102,88 @@ class Equipment extends Model
         return "IEEPIS|{$equipment->property_no}|{$equipment->serial_number}|{$equipment->brand} {$equipment->model}";
     }
 
-    // Relationships
-    public function school()
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\School, self>
+     */
+    public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);
     }
 
-    public function assignments()
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\EquipmentAssignment>
+     */
+    public function assignments(): HasMany
     {
         return $this->hasMany(EquipmentAssignment::class);
     }
 
-    public function activeAssignment()
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne<\App\Models\EquipmentAssignment>
+     */
+    public function activeAssignment(): HasOne
     {
-        return $this->hasOne(EquipmentAssignment::class)->whereNull('returned_at')->latest();
+        return $this->hasOne(EquipmentAssignment::class)
+            ->whereNull("returned_at")
+            ->latest();
     }
 
-    public function accountableOfficer()
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasOneThrough<\App\Models\Employee>
+     */
+    public function accountableOfficer(): HasOneThrough
     {
         return $this->hasOneThrough(
             Employee::class,
             EquipmentAssignment::class,
-            'equipment_id',
-            'id',
-            'id',
-            'employee_id'
+            "equipment_id",
+            "id",
+            "id",
+            "employee_id",
         );
     }
 
-    public function documents()
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Document>
+     */
+    public function documents(): HasMany
     {
         return $this->hasMany(Document::class);
     }
 
-    public function tickets()
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Ticket>
+     */
+    public function tickets(): HasMany
     {
         return $this->hasMany(Ticket::class);
     }
 
-    // Scopes
     public function scopeAssigned($query)
     {
-        return $query->where('accountability_status', 'assigned');
+        return $query->where("accountability_status", "assigned");
     }
 
     public function scopeUnassigned($query)
     {
-        return $query->where('accountability_status', 'unassigned');
+        return $query->where("accountability_status", "unassigned");
     }
 
     public function scopeDcp($query)
     {
-        return $query->where('is_dcp', true);
+        return $query->where("is_dcp", true);
     }
 
     public function scopeFunctional($query)
     {
-        return $query->where('is_functional', true);
+        return $query->where("is_functional", true);
     }
 
     public function scopeForDisposal($query)
     {
-        return $query->where('accountability_status', 'For Disposal');
+        return $query->where("accountability_status", "For Disposal");
     }
 
-    // Accessors
     public function getCurrentAccountableAttribute(): ?Employee
     {
         return $this->activeAssignment?->employee;
@@ -164,7 +191,9 @@ class Equipment extends Model
 
     public function getWarrantyStatusAttribute(): string
     {
-        if (!$this->under_warranty || !$this->warranty_end_date) return 'No Warranty';
-        return now()->lt($this->warranty_end_date) ? 'Active' : 'Expired';
+        if (!$this->under_warranty || !$this->warranty_end_date) {
+            return "No Warranty";
+        }
+        return now()->lt($this->warranty_end_date) ? "Active" : "Expired";
     }
 }
