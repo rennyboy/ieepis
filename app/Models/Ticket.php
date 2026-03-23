@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 
 class Ticket extends Model
 {
@@ -41,8 +42,9 @@ class Ticket extends Model
     {
         parent::boot();
         static::creating(function ($ticket) {
-            // Generate unique ticket number with timestamp to avoid duplicates
-            $ticket->ticket_number = self::generateUniqueTicketNumber();
+            $ticket->ticket_number = self::generateTicketNumber(
+                $ticket->school_id,
+            );
         });
     }
 
@@ -50,23 +52,69 @@ class Ticket extends Model
      * Generate a unique ticket number
      * Format: TKT-YYYY-NNNNN where NNNNN increments
      */
-    public static function generateUniqueTicketNumber(): string
+
+    public static function generateTicketNumber($schoolId): string
     {
-        $year = now()->format("Y");
-        $prefix = "TKT-{$year}-";
-        
-        // Get the highest number for this year
-        $lastTicket = static::whereYear("created_at", $year)
-            ->orderBy("id", "desc")
-            ->first();
-        
-        if ($lastTicket && preg_match("/TKT-{$year}-(\d+)/", $lastTicket->ticket_number, $matches)) {
-            $nextNumber = intval($matches[1]) + 1;
-        } else {
-            $nextNumber = 1;
+        if (empty($schoolId)) {
+            \Log::error("generateTicketNumber called with empty school_id.");
+            throw new \InvalidArgumentException(
+                "School ID cannot be empty for ticket number generation.",
+            );
         }
-        
-        return $prefix . str_pad($nextNumber, 5, "0", STR_PAD_LEFT);
+
+        // Use a MySQL-level named lock to serialize generation per school+year.
+        $year = now()->year;
+        $lockName = "ticket_number_gen_school_{$schoolId}_{$year}";
+        $lockAcquired = false;
+
+        try {
+            // Try to acquire the lock with a 10-second timeout.
+            $res = DB::select("SELECT GET_LOCK(?, 10) as got", [$lockName]);
+            $lockAcquired = isset($res[0]->got) && intval($res[0]->got) === 1;
+
+            if (!$lockAcquired) {
+                // Could not get lock in time.
+                \Log::warning(
+                    "Could not acquire MySQL GET_LOCK({$lockName}) for ticket generation.",
+                );
+                throw new \RuntimeException(
+                    "Could not acquire lock to generate ticket number. Try again.",
+                );
+            }
+
+            // Inside the lock, run a short transaction to read the last ticket and create the next number.
+            return DB::transaction(function () use ($schoolId, $year) {
+                $lastTicket = Ticket::whereYear("created_at", $year)
+                    ->where("school_id", $schoolId)
+                    ->latest("id")
+                    ->first();
+
+                $next = $lastTicket
+                    ? ((int) substr($lastTicket->ticket_number, -5)) + 1
+                    : 1;
+
+                $ticketNumber = sprintf("TKT-%s-%05d", $year, $next);
+
+                \Log::info(
+                    "Generated ticket number with GET_LOCK for school_id {$schoolId}: {$ticketNumber}",
+                );
+
+                return $ticketNumber;
+            });
+        } finally {
+            // Always attempt to release the lock if we acquired it.
+            if ($lockAcquired) {
+                try {
+                    DB::select("SELECT RELEASE_LOCK(?)", [$lockName]);
+                } catch (\Throwable $e) {
+                    // Log but don't prevent the main flow from continuing.
+                    \Log::warning(
+                        "Failed to release GET_LOCK({$lockName}): " .
+                            $e->getMessage(),
+                    );
+                }
+            }
+        }
     }
 
     /**

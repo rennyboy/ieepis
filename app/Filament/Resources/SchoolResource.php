@@ -12,6 +12,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
+use Illuminate\Database\Eloquent\Builder;
 
 class SchoolResource extends Resource
 {
@@ -115,8 +116,13 @@ class SchoolResource extends Resource
                     ->label('Personnel')
                     ->badge()->color('warning')
                     ->counts('employees'),
-                Tables\Columns\BadgeColumn::make('status')
-                    ->colors(['success' => 'active', 'danger' => 'inactive']),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active' => 'success',
+                        'inactive' => 'danger',
+                        default => 'gray',
+                    }),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->options(['active' => 'Active', 'inactive' => 'Inactive']),
@@ -150,7 +156,13 @@ class SchoolResource extends Resource
                 Infolists\Components\TextEntry::make('head_name')->label('School Head'),
                 Infolists\Components\TextEntry::make('email'),
                 Infolists\Components\TextEntry::make('mobile_1'),
-                Infolists\Components\BadgeEntry::make('status')->colors(['success' => 'active', 'danger' => 'inactive']),
+                Infolists\Components\TextEntry::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active' => 'success',
+                        'inactive' => 'danger',
+                        default => 'gray',
+                    }),
             ])->columns(3),
         ]);
     }
@@ -174,5 +186,13 @@ class SchoolResource extends Resource
             'view'   => Pages\ViewSchool::route('/{record}'),
             'edit'   => Pages\EditSchool::route('/{record}/edit'),
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->when(
+            auth()->user()->hasRole(['school-admin', 'technician']),
+            fn (Builder $query) => $query->where('id', auth()->user()->school_id),
+        );
     }
 }

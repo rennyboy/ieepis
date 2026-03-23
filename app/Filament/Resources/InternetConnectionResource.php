@@ -9,6 +9,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class InternetConnectionResource extends Resource
 {
@@ -86,5 +87,13 @@ class InternetConnectionResource extends Resource
             'create' => Pages\CreateInternetConnection::route('/create'),
             'edit'   => Pages\EditInternetConnection::route('/{record}/edit'),
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->when(
+            auth()->user()->hasRole(['school-admin', 'technician']),
+            fn (Builder $query) => $query->where('school_id', auth()->user()->school_id),
+        );
     }
 }
