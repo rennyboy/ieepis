@@ -26,7 +26,7 @@ class DocumentsRelationManager extends RelationManager
             Forms\Components\FileUpload::make('file_path')
                 ->label('File')->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
                 ->directory('documents')->required()->columnSpanFull(),
-        ])->columns(2);
+        ])->columns(['default' => 2]);
     }
 
     public function table(Table $table): Table

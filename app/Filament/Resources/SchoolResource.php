@@ -13,6 +13,10 @@ use Filament\Tables\Table;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
+use App\Models\District;
+use App\Models\Division;
+use App\Models\User;
 
 class SchoolResource extends Resource
 {
@@ -42,14 +46,42 @@ class SchoolResource extends Resource
                     Forms\Components\Select::make('status')
                         ->options(['active' => 'Active', 'inactive' => 'Inactive'])
                         ->default('active')->required(),
-                ])->columns(2),
+                ])->columns(['default' => 2]),
 
             Forms\Components\Section::make('Location')
                 ->icon('heroicon-o-map-pin')
                 ->schema([
                     Forms\Components\TextInput::make('region')->label('Regional Office'),
-                    Forms\Components\TextInput::make('division')->label('Division'),
-                    Forms\Components\TextInput::make('district')->label('District')->required(),
+                    Forms\Components\Select::make('division') // Kept 'division' as the string field for legacy compatibility, but using Division model for options
+                        ->label('Division')
+                        ->options(fn() => Division::pluck('name', 'name'))
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(fn(Forms\Set $set) => $set('district_id', null)),
+                    Forms\Components\Select::make('district_id')
+                        ->label('District')
+                        ->relationship('district', 'name')
+                        ->options(function (Forms\Get $get) {
+                            $divisionName = $get('division');
+                            return District::query()
+                                ->when($divisionName, fn($q) => $q->whereHas('division', fn($dq) => $dq->where('name', $divisionName)))
+                                ->pluck('name', 'id');
+                        })
+                        ->required()
+                        ->exists('districts', 'id')
+                        ->rules([
+                            fn (Forms\Get $get) => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                $divisionName = $get('division');
+                                if ($divisionName) {
+                                    $district = District::find($value);
+                                    if ($district && $district->division->name !== $divisionName) {
+                                        $fail("The selected district must be within the {$divisionName} division.");
+                                    }
+                                }
+                            },
+                        ])
+                        ->searchable()
+                        ->preload(),
                     Forms\Components\TextInput::make('province')->label('Province')->required(),
                     Forms\Components\TextInput::make('city_municipality')->label('City / Municipality')->required(),
                     Forms\Components\TextInput::make('barangay')->label('Barangay'),
@@ -60,7 +92,7 @@ class SchoolResource extends Resource
                     Forms\Components\TextInput::make('longitude')->label('Longitude')->numeric(),
                     Forms\Components\TextInput::make('travel_time_minutes')
                         ->label('Travel Time to Nearest City Center (minutes)')->numeric(),
-                ])->columns(3),
+                ])->columns(['default' => 3]),
 
             Forms\Components\Section::make('Contact Information')
                 ->icon('heroicon-o-phone')
@@ -74,8 +106,8 @@ class SchoolResource extends Resource
                     Forms\Components\TextInput::make('email')->label('School Email')->email(),
                     Forms\Components\TextInput::make('landline')->label('Landline'),
                     Forms\Components\TextInput::make('mobile_1')->label('Mobile 1'),
-                    Forms\Components\TextInput::make('mobile_2')->label('Mobile 2'),
-                ])->columns(3),
+                    Forms\Components\TextInput::make('mobile_2')                        ->label('Mobile 2'),
+                ])->columns(['default' => 3]),
 
             Forms\Components\Section::make('Classification & Accessibility')
                 ->icon('heroicon-o-map')
@@ -86,7 +118,7 @@ class SchoolResource extends Resource
                         ->options(['None' => 'None', 'Geographically Isolated' => 'Geographically Isolated', 'Disadvantaged' => 'Disadvantaged', 'Conflict-Affected' => 'Conflict-Affected']),
                     Forms\Components\Textarea::make('recent_developments')
                         ->label('Recent Developments')->rows(3)->columnSpanFull(),
-                ])->columns(2),
+                ])->columns(['default' => 2]),
 
             Forms\Components\Section::make('Logo')
                 ->icon('heroicon-o-photo')
@@ -102,8 +134,8 @@ class SchoolResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\ImageColumn::make('logo')->circular()->defaultImageUrl(asset('images/school-default.png')),
                 Tables\Columns\TextColumn::make('name')->searchable()->sortable()->weight('bold'),
+                Tables\Columns\TextColumn::make('division')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('school_code')->badge()->color('info')->sortable(),
                 Tables\Columns\TextColumn::make('district')->searchable(),
                 Tables\Columns\TextColumn::make('city_municipality')->label('Municipality'),
@@ -125,6 +157,9 @@ class SchoolResource extends Resource
                     }),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('division')
+                    ->label('Division')
+                    ->options(fn() => Division::pluck('name', 'name')),
                 Tables\Filters\SelectFilter::make('status')->options(['active' => 'Active', 'inactive' => 'Inactive']),
                 Tables\Filters\SelectFilter::make('governance_level')
                     ->options(['Central' => 'Central', 'Regional' => 'Regional', 'SDO' => 'SDO', 'School' => 'School']),
@@ -163,11 +198,11 @@ class SchoolResource extends Resource
                         'inactive' => 'danger',
                         default => 'gray',
                     }),
-            ])->columns(3),
+            ])->columns(['default' => 3]),
         ]);
     }
 
-    public static function getRelationManagers(): array
+    public static function getRelations(): array
     {
         return [
             RelationManagers\EmployeesRelationManager::class,
@@ -188,11 +223,41 @@ class SchoolResource extends Resource
         ];
     }
 
+    public static function can(string $action, ?\Illuminate\Database\Eloquent\Model $record = null): bool
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        if (!$user) return false;
+
+        if ($action === 'create') {
+            return $user->hasRole(['super-admin', 'division-admin']);
+        }
+
+        return parent::can($action, $record);
+    }
+
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->when(
-            auth()->user()->hasRole(['school-admin', 'technician']),
-            fn (Builder $query) => $query->where('id', auth()->user()->school_id),
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        $query = parent::getEloquentQuery();
+
+        if (!$user) return $query;
+
+        // School admins and technicians see only their assigned school
+        $query->when(
+            fn() => $user->hasRole(["school-admin", "technician"]),
+            fn(Builder $q) => $q->where("id", $user->school_id),
         );
+
+        // Division Admins see schools in their division
+        $query->when(
+            fn() => $user->hasRole("division-admin") && $user->division,
+            fn(Builder $q) => $q->where("division", $user->division),
+        );
+
+        return $query;
     }
 }

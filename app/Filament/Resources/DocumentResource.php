@@ -9,15 +9,24 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class DocumentResource extends Resource
 {
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->when(
-            auth()->user()->hasRole("school-admin"),
-            fn($query) => $query->where("school_id", auth()->user()->school_id),
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        $query = parent::getEloquentQuery();
+
+        $query->when(
+            fn() => $user && $user->school_id && !$user->hasRole("super-admin"),
+            fn(Builder $q) => $q->where("school_id", $user->school_id),
         );
+
+        return $query;
     }
 
     protected static ?string $model = Document::class;
@@ -77,7 +86,7 @@ class DocumentResource extends Resource
                         ->rows(3)
                         ->columnSpanFull(),
                 ])
-                ->columns(2),
+                ->columns(['default' => 2]),
 
             Forms\Components\Section::make("File Upload")->schema([
                 Forms\Components\FileUpload::make("file_path")
@@ -148,6 +157,15 @@ class DocumentResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                Tables\Actions\Action::make("view_file")
+                    ->label("View File")
+                    ->icon("heroicon-o-eye")
+                    ->url(
+                        fn(Document $record) => asset(
+                            "storage/" . $record->file_path,
+                        ),
+                    )
+                    ->openUrlInNewTab(),
                 Tables\Actions\Action::make("download")
                     ->label("Download")
                     ->icon("heroicon-o-arrow-down-tray")

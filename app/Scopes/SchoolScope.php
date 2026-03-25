@@ -33,6 +33,7 @@ class SchoolScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
+        /** @var \App\Models\User|null $user */
         $user = Auth::user();
 
         // Skip filtering if:

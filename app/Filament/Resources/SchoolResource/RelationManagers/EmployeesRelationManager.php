@@ -5,6 +5,7 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 class EmployeesRelationManager extends RelationManager {
     protected static string $relationship = 'employees';
     protected static ?string $title = 'Personnel';
@@ -16,11 +17,11 @@ class EmployeesRelationManager extends RelationManager {
             Forms\Components\TextInput::make('position')->required(),
             Forms\Components\Select::make('employment_type')->options(['teaching'=>'Teaching','non-teaching'=>'Non-Teaching'])->required(),
             Forms\Components\Select::make('status')->options(['active'=>'Active','inactive'=>'Inactive'])->default('active'),
-        ])->columns(2);
+        ])->columns(['default' => 2]);
     }
     public function table(Table $table): Table {
         return $table->recordTitleAttribute('full_name')->columns([
-            Tables\Columns\TextColumn::make('full_name')->weight('bold')->searchable(['first_name','last_name']),
+            Tables\Columns\TextColumn::make('full_name')->weight('bold')->searchable(query: fn (Builder $query, string $search): Builder => $query->where(fn (Builder $q) => $q->where('first_name', 'like', "%{$search}%")->orWhere('last_name', 'like', "%{$search}%"))),
             Tables\Columns\TextColumn::make('employee_number')->fontFamily('mono'),
             Tables\Columns\TextColumn::make('position'),
             Tables\Columns\TextColumn::make('employment_type')->badge(),

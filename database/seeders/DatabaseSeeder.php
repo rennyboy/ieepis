@@ -13,6 +13,8 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
+use App\Models\Division;
+use App\Models\District;
 
 class DatabaseSeeder extends Seeder
 {
@@ -24,15 +26,37 @@ class DatabaseSeeder extends Seeder
         Role::firstOrCreate(["name" => "school-admin", "guard_name" => "web"]);
         Role::firstOrCreate(["name" => "technician", "guard_name" => "web"]);
 
+        // ── Create Divisions and Districts
+        $davao = Division::firstOrCreate(['name' => 'Davao City Division'], ['region' => 'Region XI']);
+        $gensan = Division::firstOrCreate(['name' => 'General Santos City Division'], ['region' => 'Region XII']);
+
+        District::firstOrCreate(['name' => 'Davao North'], ['division_id' => $davao->id, 'division' => $davao->name]);
+        District::firstOrCreate(['name' => 'Davao South'], ['division_id' => $davao->id, 'division' => $davao->name]);
+        District::firstOrCreate(['name' => 'GenSan West'], ['division_id' => $gensan->id, 'division' => $gensan->name]);
+
         // ── Super Admin user
         $adminUser = User::firstOrCreate(
             ["email" => "admin@deped.gov.ph"],
             [
                 "name" => "System Administrator",
                 "password" => Hash::make("P@ssw0rd123"),
+                "approval_status" => "approved",
             ],
         );
         $adminUser->assignRole("super-admin");
+
+        // ── Test School Admin (Triggers Wizard)
+        $testAdmin = User::firstOrCreate(
+            ["email" => "test.admin@deped.gov.ph"],
+            [
+                "name" => "Test School Admin",
+                "password" => Hash::make("P@ssw0rd123"),
+                "approval_status" => "approved",
+                "division" => "Davao City Division",
+                "division_id" => $davao->id,
+            ],
+        );
+        $testAdmin->assignRole("school-admin");
 
         // ── Schools
         $schools = [

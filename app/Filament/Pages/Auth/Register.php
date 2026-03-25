@@ -1,0 +1,55 @@
+<?php
+
+namespace App\Filament\Pages\Auth;
+
+use App\Models\ApprovedUser;
+use App\Models\User;
+use Filament\Pages\Auth\Register as BaseRegister;
+use Filament\Http\Responses\Auth\Contracts\RegistrationResponse;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+
+class Register extends BaseRegister
+{
+    protected function handleRegistration(array $data): User
+    {
+        // Check if the email is whitelisted and approved
+        $approvedUser = ApprovedUser::where('email', $data['email'])
+            ->where('status', 'approved')
+            ->first();
+
+        if (!$approvedUser) {
+            // Check if it's pending so we can give a better message
+            $pendingUser = ApprovedUser::where('email', $data['email'])
+                ->where('status', 'pending')
+                ->first();
+
+            if ($pendingUser) {
+                throw ValidationException::withMessages([
+                    'data.email' => 'Your email is in our registry but pending approval. Please wait for an administrator to approve your account.',
+                ]);
+            }
+
+            throw ValidationException::withMessages([
+                'data.email' => 'This email is not authorized to register. Please contact your Division Administrator.',
+            ]);
+        }
+
+        // Create the user
+        $user = User::create([
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'approval_status' => 'approved', // Already checked above
+            'division' => $approvedUser->division,
+            'division_id' => $approvedUser->division_id,
+        ]);
+
+        // Assign the role from the whitelist
+        if ($approvedUser->role) {
+            $user->assignRole($approvedUser->role);
+        }
+
+        return $user;
+    }
+}

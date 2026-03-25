@@ -30,9 +30,17 @@ class AssignmentResource extends Resource
                         ->label("School")
                         ->relationship("school", "name")
                         ->disabled(
-                            fn() => !Auth::user()->hasRole("super-admin"),
+                            function () {
+                                /** @var \App\Models\User $user */
+                                $user = Auth::user();
+                                return !$user->hasRole("super-admin");
+                            },
                         )
-                        ->default(fn() => Auth::user()->school_id)
+                        ->default(function () {
+                            /** @var \App\Models\User $user */
+                            $user = Auth::user();
+                            return $user->school_id;
+                        })
                         ->searchable()
                         ->preload()
                         ->required(),
@@ -48,8 +56,8 @@ class AssignmentResource extends Resource
                         )
                         ->getOptionLabelFromRecordUsing(
                             fn(
-                                $record,
-                            ) => "{$record->brand} {$record->model} ({$record->property_no})",
+                                Equipment $record,
+                            ): string => "{$record->brand} {$record->model} ({$record->property_no})",
                         )
                         ->searchable()
                         ->preload()
@@ -108,7 +116,7 @@ class AssignmentResource extends Resource
                         ->rows(3)
                         ->columnSpanFull(),
                 ])
-                ->columns(2),
+                ->columns(['default' => 2]),
 
             Forms\Components\Section::make("Return Details")->schema([
                 Forms\Components\DatePicker::make("returned_at")->label(
@@ -182,7 +190,11 @@ class AssignmentResource extends Resource
                 Tables\Filters\SelectFilter::make("school_id")
                     ->label("School")
                     ->relationship("school", "name")
-                    ->visible(fn() => Auth::user()->hasRole("super-admin")),
+                    ->visible(function () {
+                        /** @var \App\Models\User $user */
+                        $user = Auth::user();
+                        return $user->hasRole("super-admin");
+                    }),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -193,21 +205,20 @@ class AssignmentResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
+        /** @var \App\Models\User|null $user */
         $user = Auth::user();
 
-        // Super admins can see all assignments
-        if ($user->hasRole("super-admin")) {
-            return $query;
-        }
+        $query = parent::getEloquentQuery();
 
-        // Other users can only see assignments from their school
-        if ($user->school_id) {
-            return $query->where("school_id", $user->school_id);
-        }
+        $query->when(
+            fn() => $user && !$user->hasRole("super-admin"),
+            fn(Builder $q) => $q->where(
+                fn(Builder $q2) => $q2->where("school_id", $user->school_id)
+                    ->orWhereNull("school_id"),
+            ),
+        );
 
-        // Users with no school_id can't see anything
-        return $query->whereNull("school_id");
+        return $query;
     }
 
     public static function getPages(): array

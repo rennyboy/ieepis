@@ -15,10 +15,17 @@ class TicketResource extends Resource
 {
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->when(
-            auth()->user()->hasRole("school-admin"),
-            fn($query) => $query->where("school_id", auth()->user()->school_id),
+        /** @var \App\Models\User $user */
+        $user = \Illuminate\Support\Facades\Auth::user();
+
+        $query = parent::getEloquentQuery();
+
+        $query->when(
+            fn() => $user->hasRole("school-admin"),
+            fn(Builder $q) => $q->where("school_id", $user->school_id),
         );
+
+        return $query;
     }
 
     protected static ?string $model = Ticket::class;
@@ -67,11 +74,10 @@ class TicketResource extends Resource
                         ->required()
                         ->columnSpanFull(),
                     Forms\Components\Textarea::make("description")
-                        ->required()
-                        ->rows(4)
+                        ->rows(3)
                         ->columnSpanFull(),
                 ])
-                ->columns(2),
+                ->columns(['default' => 2]),
 
             Forms\Components\Section::make("Status & Assignment")
                 ->schema([
@@ -103,12 +109,12 @@ class TicketResource extends Resource
                     Forms\Components\DateTimePicker::make("resolved_at")->label(
                         "Resolved At",
                     ),
-                    Forms\Components\Textarea::make("resolution_notes")
-                        ->label("Resolution Notes")
+                    Forms\Components\Textarea::make("remarks")
+                        ->label("Remarks")
                         ->rows(3)
                         ->columnSpanFull(),
                 ])
-                ->columns(2),
+                ->columns(['default' => 2]),
         ]);
     }
 

@@ -54,11 +54,11 @@ class UserResource extends Resource
                 ->password()
                 ->required()
                 ->minLength(8)
-                ->hiddenOn(["edit"])
+                        ->hiddenOn("edit")
                 ->dehydrateStateUsing(fn($state) => Hash::make($state)),
             Select::make("school_id")
                 ->label("School")
-                ->options(function () {
+                ->options(function (): array {
                     /** @var User|null $user */
                     $user = Auth::user();
                     if (
@@ -134,7 +134,7 @@ class UserResource extends Resource
                     }),
                 SelectFilter::make("role")
                     ->label("Role")
-                    ->options(function () {
+                    ->options(function (): array {
                         /** @var Collection<int, Role> $roles */
                         $roles = Role::all();
                         return $roles->pluck("name", "name")->toArray();
@@ -145,7 +145,7 @@ class UserResource extends Resource
                             return $query->whereHas("roles", function (
                                 Builder $subQuery,
                             ) use ($data) {
-                                $subQuery->where("name", $data["value"]);
+                                $subQuery->where(fn(Builder $q) => $q->where("name", $data["value"]));
                             });
                         }
                         return $query;
@@ -157,7 +157,7 @@ class UserResource extends Resource
                     ->icon("heroicon-o-user-plus")
                     ->form([
                         Select::make("role")
-                            ->options(function () {
+                            ->options(function (): array {
                                 /** @var Collection<int, Role> $roles */
                                 $roles = Role::all();
                                 return $roles->pluck("name", "name")->toArray();
@@ -239,26 +239,28 @@ class UserResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+
         $query = parent::getEloquentQuery()->withoutGlobalScopes([
             SoftDeletingScope::class,
         ]);
 
-        /** @var User|null $user */
-        $user = Auth::user();
-
-        if (!($user instanceof User)) {
+        if (!$user instanceof User) {
             return $query->whereRaw("1=0");
         }
 
         // Scope users for SDO Admins to only see their school's users
-        if ($user->hasRole("sdo-admin")) {
-            return $query->where("school_id", $user->school_id);
-        }
+        $query->when(
+            fn() => $user->hasRole("sdo-admin"),
+            fn(Builder $q) => $q->where("school_id", $user->school_id),
+        );
 
         // Scope users for School Admins to only see their own school's users
-        if ($user->hasRole("school-admin")) {
-            return $query->where("school_id", $user->school_id);
-        }
+        $query->when(
+            fn() => $user->hasRole("school-admin"),
+            fn(Builder $q) => $q->where("school_id", $user->school_id),
+        );
 
         return $query;
     }

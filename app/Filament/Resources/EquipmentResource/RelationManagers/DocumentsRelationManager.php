@@ -26,7 +26,7 @@ class DocumentsRelationManager extends RelationManager
             Forms\Components\FileUpload::make('file_path')
                 ->label('File')->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
                 ->directory('documents')->required()->columnSpanFull(),
-        ])->columns(2);
+        ])->columns(['default' => 2]);
     }
 
     public function table(Table $table): Table
@@ -42,6 +42,11 @@ class DocumentsRelationManager extends RelationManager
             ])
             ->headerActions([Tables\Actions\CreateAction::make()])
             ->actions([
+                Tables\Actions\Action::make('view_file')
+                    ->label('View File')
+                    ->icon('heroicon-o-eye')
+                    ->url(fn ($record) => asset('storage/' . $record->file_path))
+                    ->openUrlInNewTab(),
                 Tables\Actions\Action::make('download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->url(fn ($record) => asset('storage/' . $record->file_path))

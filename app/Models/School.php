@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
@@ -51,6 +52,7 @@ use Spatie\Activitylog\LogOptions;
  * @property string|null $gidca_type
  * @property string|null $recent_developments
  * @property string|null $status
+ * @property int|null $district_id
  * @property int|null $network_administrator_id
  * @property \Carbon\Carbon|null $created_at
  * @property \Carbon\Carbon|null $updated_at
@@ -78,6 +80,7 @@ class School extends Model
         "school_code",
         "school_id_number",
         "governance_level",
+        "district_id",
         "district",
         "province",
         "city_municipality",
@@ -163,9 +166,17 @@ class School extends Model
     }
 
     /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\District, self>
+     */
+    public function district(): BelongsTo
+    {
+        return $this->belongsTo(District::class);
+    }
+
+    /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\Employee, self>
      */
-    public function networkAdministrator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function networkAdministrator(): BelongsTo
     {
         return $this->belongsTo(Employee::class, "network_administrator_id");
     }
