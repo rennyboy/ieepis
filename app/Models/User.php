@@ -54,11 +54,12 @@ class User extends Authenticatable implements FilamentUser
 {
     use HasFactory, Notifiable, HasRoles;
 
-    protected $fillable = ["name", "email", "password", "school_id"];
+    protected $fillable = ["name", "email", "password", "school_id", "approval_status", "division", "division_id"];
     protected $hidden = ["password", "remember_token"];
     protected $casts = [
         "email_verified_at" => "datetime",
         "password" => "hashed",
+        "approval_status" => "string",
     ];
 
     /**
@@ -72,10 +73,19 @@ class User extends Authenticatable implements FilamentUser
     }
 
     /**
-     * Determine if the user can access the Filament panel
+     * Determine if the user can access the Filament panel.
+     * Blocks pending and rejected users from accessing the system.
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return true; // Customize with roles: $this->hasRole(['super-admin', 'admin'])
+        return $this->approval_status === 'approved';
+    }
+
+    /**
+     * Check if the user's account is approved.
+     */
+    public function isApproved(): bool
+    {
+        return $this->approval_status === 'approved';
     }
 }

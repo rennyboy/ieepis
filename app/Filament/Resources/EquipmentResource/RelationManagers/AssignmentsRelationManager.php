@@ -36,7 +36,7 @@ class AssignmentsRelationManager extends RelationManager
             Forms\Components\DatePicker::make('returned_at')->label('Returned At (leave blank if active)'),
             Forms\Components\TextInput::make('assigned_by')->required(),
             Forms\Components\Textarea::make('notes')->columnSpanFull(),
-        ])->columns(2);
+        ])->columns(['default' => 2]);
     }
 
     public function table(Table $table): Table

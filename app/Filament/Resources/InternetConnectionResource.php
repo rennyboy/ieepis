@@ -10,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 
 class InternetConnectionResource extends Resource
 {
@@ -39,7 +40,7 @@ class InternetConnectionResource extends Resource
                 Forms\Components\TextInput::make('monthly_cost')->label('Monthly Cost (₱)')->numeric()->prefix('₱'),
                 Forms\Components\DatePicker::make('subscription_start')->label('Subscription Start'),
                 Forms\Components\DatePicker::make('subscription_end')->label('Subscription End'),
-            ])->columns(2),
+            ])->columns(['default' => 2]),
 
             Forms\Components\Section::make('Speed Test Results')->schema([
                 Forms\Components\TextInput::make('contracted_download_speed')->label('Contracted Download (Mbps)')->numeric(),
@@ -49,7 +50,7 @@ class InternetConnectionResource extends Resource
                 Forms\Components\TextInput::make('latency_ms')->label('Latency (ms)')->numeric(),
                 Forms\Components\DatePicker::make('speed_test_date')->label('Speed Test Date'),
                 Forms\Components\Textarea::make('remarks')->rows(2)->columnSpanFull(),
-            ])->columns(3),
+            ])->columns(['default' => 3]),
         ]);
     }
 
@@ -63,7 +64,7 @@ class InternetConnectionResource extends Resource
                 Tables\Columns\TextColumn::make('connection_type')->label('Type')->badge()->color('gray'),
                 Tables\Columns\TextColumn::make('actual_download_speed')->label('↓ Mbps')
                     ->formatStateUsing(fn ($state) => $state ? number_format($state, 1) : '—')
-                    ->color(fn ($state) => $state >= 50 ? 'success' : ($state >= 20 ? 'warning' : 'danger')),
+                    ->color(fn ($state) => (float) $state >= 50.0 ? 'success' : ((float) $state >= 20.0 ? 'warning' : 'danger')),
                 Tables\Columns\TextColumn::make('actual_upload_speed')->label('↑ Mbps')
                     ->formatStateUsing(fn ($state) => $state ? number_format($state, 1) : '—'),
                 Tables\Columns\TextColumn::make('latency_ms')->label('Latency ms'),
@@ -91,9 +92,16 @@ class InternetConnectionResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->when(
-            auth()->user()->hasRole(['school-admin', 'technician']),
-            fn (Builder $query) => $query->where('school_id', auth()->user()->school_id),
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        $query = parent::getEloquentQuery();
+
+        $query->when(
+            fn() => $user->hasRole(["school-admin", "technician"]),
+            fn(Builder $q) => $q->where("school_id", $user->school_id),
         );
+
+        return $query;
     }
 }

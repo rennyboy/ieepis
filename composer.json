@@ -9,6 +9,7 @@
         "barryvdh/laravel-dompdf": "^2.2",
         "filament/filament": "^3.2",
         "laravel/framework": "^11.0",
+        "laravel/socialite": "^5.25",
         "laravel/tinker": "^2.9",
         "maatwebsite/excel": "^3.1",
         "openai-php/laravel": "^0.19.0",

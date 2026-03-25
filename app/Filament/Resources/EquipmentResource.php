@@ -131,7 +131,7 @@ class EquipmentResource extends Resource
                                 ->rows(3)
                                 ->columnSpanFull(),
                         ])
-                        ->columns(2),
+                        ->columns(['default' => 2]),
 
                     // ── TAB 2: Classification & DCP
                     Forms\Components\Tabs\Tab::make("Classification")
@@ -168,7 +168,7 @@ class EquipmentResource extends Resource
                                 ->visible(fn(Get $get) => $get("is_dcp"))
                                 ->numeric(),
                         ])
-                        ->columns(2),
+                        ->columns(['default' => 2]),
 
                     // ── TAB 3: Acquisition
                     Forms\Components\Tabs\Tab::make("Acquisition")
@@ -247,7 +247,7 @@ class EquipmentResource extends Resource
                                 "supporting_doc_no_acquisition",
                             )->label("Document No."),
                         ])
-                        ->columns(2),
+                        ->columns(['default' => 2]),
 
                     // ── TAB 4: Warranty & Condition
                     Forms\Components\Tabs\Tab::make("Condition")
@@ -309,7 +309,7 @@ class EquipmentResource extends Resource
                                 ->rows(3)
                                 ->columnSpanFull(),
                         ])
-                        ->columns(2),
+                        ->columns(['default' => 2]),
 
                     // ── TAB 5: Issuance / Assignment
                     Forms\Components\Tabs\Tab::make("Issuance")
@@ -339,7 +339,7 @@ class EquipmentResource extends Resource
                                 "supporting_doc_no_issuance",
                             )->label("Document No."),
                         ])
-                        ->columns(2),
+                        ->columns(['default' => 2]),
                 ])
                 ->columnSpanFull(),
         ]);
@@ -416,6 +416,24 @@ class EquipmentResource extends Resource
                         "danger" => "Expired",
                         "gray" => "No Warranty",
                     ]),
+                Tables\Columns\TextColumn::make("tickets_count")
+                    ->counts("tickets")
+                    ->label("Tickets")
+                    ->badge()
+                    ->color("info")
+                    ->sortable(),
+                Tables\Columns\TextColumn::make("maintenance_tickets_count")
+                    ->counts("maintenanceTickets")
+                    ->label("Maintenance Logs")
+                    ->badge()
+                    ->color("warning")
+                    ->sortable(),
+                Tables\Columns\TextColumn::make("assignments_count")
+                    ->counts("assignments")
+                    ->label("Transfers")
+                    ->badge()
+                    ->color("success")
+                    ->sortable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make("school")
@@ -528,10 +546,22 @@ class EquipmentResource extends Resource
                                 "equipment_location",
                             )->label("Location"),
                             Infolists\Components\TextEntry::make(
+                                "assignments_count",
+                            )->getStateUsing(fn($record) => $record->assignments()->count())
+                            ->label("Ownership Transfers")
+                            ->badge()
+                            ->color("success"),
+                            Infolists\Components\TextEntry::make(
+                                "maintenance_tickets_count",
+                            )->getStateUsing(fn($record) => $record->maintenanceTickets()->count())
+                            ->label("Maintenance Performed")
+                            ->badge()
+                            ->color("warning"),
+                            Infolists\Components\TextEntry::make(
                                 "remarks",
                             )->columnSpanFull(),
                         ])
-                        ->columns(3),
+                        ->columns(['default' => 3]),
                     Infolists\Components\Tabs\Tab::make("Acquisition")
                         ->schema([
                             Infolists\Components\TextEntry::make(
@@ -567,13 +597,13 @@ class EquipmentResource extends Resource
                                 "uacs_code",
                             )->label("UACS Code"),
                         ])
-                        ->columns(3),
+                        ->columns(['default' => 3]),
                 ])
                 ->columnSpanFull(),
         ]);
     }
 
-    public static function getRelationManagers(): array
+    public static function getRelations(): array
     {
         return [
             RelationManagers\AssignmentsRelationManager::class,
@@ -584,10 +614,17 @@ class EquipmentResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->when(
-            auth()->user()->hasRole("school-admin"),
-            fn($query) => $query->where("school_id", auth()->user()->school_id),
+        /** @var \App\Models\User $user */
+        $user = \Illuminate\Support\Facades\Auth::user();
+
+        $query = parent::getEloquentQuery();
+
+        $query->when(
+            fn() => $user->hasRole("school-admin"),
+            fn(Builder $q) => $q->whereIn("school_id", [$user->school_id]),
         );
+
+        return $query;
     }
 
     public static function getPages(): array

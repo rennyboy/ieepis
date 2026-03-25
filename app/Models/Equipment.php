@@ -124,7 +124,7 @@ class Equipment extends Model
     public function activeAssignment(): HasOne
     {
         return $this->hasOne(EquipmentAssignment::class)
-            ->whereNull("returned_at")
+            ->where(fn ($q) => $q->whereNull("returned_at"))
             ->latest();
     }
 
@@ -159,29 +159,37 @@ class Equipment extends Model
         return $this->hasMany(Ticket::class);
     }
 
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Ticket>
+     */
+    public function maintenanceTickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class)->where(fn ($q) => $q->where("ticket_type", "Maintenance"));
+    }
+
     public function scopeAssigned($query)
     {
-        return $query->where("accountability_status", "assigned");
+        return $query->where(["accountability_status" => "assigned"]);
     }
 
     public function scopeUnassigned($query)
     {
-        return $query->where("accountability_status", "unassigned");
+        return $query->where(["accountability_status" => "unassigned"]);
     }
 
     public function scopeDcp($query)
     {
-        return $query->where("is_dcp", true);
+        return $query->where(["is_dcp" => true]);
     }
 
     public function scopeFunctional($query)
     {
-        return $query->where("is_functional", true);
+        return $query->where(["is_functional" => true]);
     }
 
     public function scopeForDisposal($query)
     {
-        return $query->where("accountability_status", "For Disposal");
+        return $query->where(["accountability_status" => "For Disposal"]);
     }
 
     public function getCurrentAccountableAttribute(): ?Employee

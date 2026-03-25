@@ -30,6 +30,8 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use App\Http\Middleware\EnsureAccountIsApproved;
+use App\Filament\Pages\Auth\Register;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -40,6 +42,7 @@ class AdminPanelProvider extends PanelProvider
             ->id("admin")
             ->path("admin")
             ->login()
+            ->registration(Register::class)
             ->colors([
                 "primary" => Color::Blue,
                 "danger" => Color::Red,
@@ -99,7 +102,10 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
-            ->authMiddleware([Authenticate::class])
+            ->authMiddleware([
+                Authenticate::class,
+                EnsureAccountIsApproved::class,
+            ])
             ->databaseNotifications()
             ->globalSearch()
             ->globalSearchKeyBindings(["command+k", "ctrl+k"])
@@ -108,6 +114,22 @@ class AdminPanelProvider extends PanelProvider
                     "My Profile",
                 ),
             ])
+            ->renderHook(
+                "panels::auth.login.after",
+                fn () => view("auth.google-button-login")
+            )
+            ->renderHook(
+                "panels::auth.login.form.after",
+                fn () => view("auth.google-button-login")
+            )
+            ->renderHook(
+                "panels::auth.register.after",
+                fn () => view("auth.google-button-register")
+            )
+            ->renderHook(
+                "panels::auth.register.form.after",
+                fn () => view("auth.google-button-register")
+            )
             // ✅ Keep render hook for user info in minimal top bar
             ->renderHook(
                 "panels::topbar.end",

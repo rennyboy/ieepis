@@ -8,10 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Ticket extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, LogsActivity;
 
     protected $fillable = [
         "school_id",
@@ -20,6 +23,7 @@ class Ticket extends Model
         "ticket_number",
         "issue_title",
         "description",
+        "ticket_type",
         "priority",
         "status",
         "assigned_to_id",
@@ -32,6 +36,11 @@ class Ticket extends Model
         "resolved_at" => "datetime",
         "closed_at" => "datetime",
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()->logAll()->logOnlyDirty();
+    }
 
     protected static function booted(): void
     {
@@ -56,7 +65,7 @@ class Ticket extends Model
     public static function generateTicketNumber($schoolId): string
     {
         if (empty($schoolId)) {
-            \Log::error("generateTicketNumber called with empty school_id.");
+            Log::error("generateTicketNumber called with empty school_id.");
             throw new \InvalidArgumentException(
                 "School ID cannot be empty for ticket number generation.",
             );
@@ -74,7 +83,7 @@ class Ticket extends Model
 
             if (!$lockAcquired) {
                 // Could not get lock in time.
-                \Log::warning(
+                Log::warning(
                     "Could not acquire MySQL GET_LOCK({$lockName}) for ticket generation.",
                 );
                 throw new \RuntimeException(
@@ -95,7 +104,7 @@ class Ticket extends Model
 
                 $ticketNumber = sprintf("TKT-%s-%05d", $year, $next);
 
-                \Log::info(
+                Log::info(
                     "Generated ticket number with GET_LOCK for school_id {$schoolId}: {$ticketNumber}",
                 );
 
@@ -108,7 +117,7 @@ class Ticket extends Model
                     DB::select("SELECT RELEASE_LOCK(?)", [$lockName]);
                 } catch (\Throwable $e) {
                     // Log but don't prevent the main flow from continuing.
-                    \Log::warning(
+                    Log::warning(
                         "Failed to release GET_LOCK({$lockName}): " .
                             $e->getMessage(),
                     );

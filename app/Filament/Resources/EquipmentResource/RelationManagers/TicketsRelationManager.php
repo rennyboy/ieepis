@@ -17,6 +17,9 @@ class TicketsRelationManager extends RelationManager
     {
         return $form->schema([
             Forms\Components\TextInput::make('issue_title')->required()->columnSpanFull(),
+            Forms\Components\Select::make('ticket_type')
+                ->options(['Support' => 'Support', 'Maintenance' => 'Maintenance', 'Repair' => 'Repair'])
+                ->default('Support'),
             Forms\Components\Select::make('priority')
                 ->options(['low' => 'Low', 'medium' => 'Medium', 'high' => 'High', 'critical' => 'Critical'])
                 ->default('medium'),
@@ -24,7 +27,7 @@ class TicketsRelationManager extends RelationManager
                 ->options(['open' => 'Open', 'in-progress' => 'In Progress', 'resolved' => 'Resolved'])
                 ->default('open'),
             Forms\Components\Textarea::make('description')->required()->columnSpanFull(),
-        ])->columns(2);
+        ])->columns(['default' => 2]);
     }
 
     public function table(Table $table): Table
@@ -34,6 +37,7 @@ class TicketsRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\TextColumn::make('ticket_number')->fontFamily('mono')->color('primary'),
                 Tables\Columns\TextColumn::make('issue_title')->weight('bold')->limit(35),
+                Tables\Columns\TextColumn::make('ticket_type')->badge()->color('info'),
                 Tables\Columns\TextColumn::make('priority')
                     ->badge()->colors(['success' => 'low', 'warning' => 'medium', 'danger' => fn ($state) => in_array($state, ['high', 'critical'])]),
                 Tables\Columns\TextColumn::make('status')

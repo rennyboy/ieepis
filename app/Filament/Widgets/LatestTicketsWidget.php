@@ -29,7 +29,7 @@ class LatestTicketsWidget extends BaseWidget
                 Tables\Columns\TextColumn::make('assignedTo.full_name')->label('Assigned To'),
                 Tables\Columns\TextColumn::make('created_at')->label('Created')->since(),
             ])
-            ->paginated([5, 10])
+            ->paginated(true)
             ->defaultPaginationPageOption(5);
     }
 }

@@ -24,7 +24,7 @@ class TicketsRelationManager extends RelationManager
                 ->options(['open' => 'Open', 'in-progress' => 'In Progress', 'resolved' => 'Resolved'])
                 ->default('open'),
             Forms\Components\Textarea::make('description')->required()->columnSpanFull(),
-        ])->columns(2);
+        ])->columns(['default' => 2]);
     }
 
     public function table(Table $table): Table

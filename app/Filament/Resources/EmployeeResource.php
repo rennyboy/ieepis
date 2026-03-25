@@ -18,10 +18,17 @@ class EmployeeResource extends Resource
 {
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->when(
-            auth()->user()->hasRole("school-admin"),
-            fn($query) => $query->where("school_id", auth()->user()->school_id),
+        /** @var \App\Models\User $user */
+        $user = \Illuminate\Support\Facades\Auth::user();
+
+        $query = parent::getEloquentQuery();
+
+        $query->when(
+            fn() => $user->hasRole("school-admin"),
+            fn(Builder $q) => $q->whereIn("school_id", [$user->school_id]),
         );
+
+        return $query;
     }
 
     protected static ?string $model = Employee::class;
@@ -59,7 +66,7 @@ class EmployeeResource extends Resource
                         ->imagePreviewHeight("80")
                         ->columnSpanFull(),
                 ])
-                ->columns(3),
+                ->columns(['default' => 3]),
 
             Forms\Components\Section::make("Employment Details")
                 ->icon("heroicon-o-briefcase")
@@ -103,7 +110,7 @@ class EmployeeResource extends Resource
                         "Non-DepEd Funded",
                     ),
                 ])
-                ->columns(3),
+                ->columns(['default' => 3]),
 
             Forms\Components\Section::make("Contact Information")
                 ->icon("heroicon-o-phone")
@@ -121,7 +128,7 @@ class EmployeeResource extends Resource
                         "Mobile No. 2",
                     ),
                 ])
-                ->columns(2),
+                ->columns(['default' => 2]),
 
             Forms\Components\Section::make("Separation Details")
                 ->icon("heroicon-o-arrow-right-on-rectangle")
@@ -149,7 +156,7 @@ class EmployeeResource extends Resource
                         "Detailed/Transferred To",
                     ),
                 ])
-                ->columns(2)
+                ->columns(['default' => 2])
                 ->collapsible(),
         ]);
     }
@@ -167,7 +174,12 @@ class EmployeeResource extends Resource
                     ),
                 Tables\Columns\TextColumn::make("full_name")
                     ->label("Name")
-                    ->searchable(["first_name", "last_name", "middle_name"])
+                    ->searchable(query: function ($query, string $search) {
+                        return $query
+                            ->whereRaw('first_name like ?', ["%{$search}%"])
+                            ->orWhereRaw('last_name like ?', ["%{$search}%"])
+                            ->orWhereRaw('middle_name like ?', ["%{$search}%"]);
+                    })
                     ->sortable()
                     ->weight("bold"),
                 Tables\Columns\TextColumn::make("employee_number")
@@ -256,11 +268,11 @@ class EmployeeResource extends Resource
                     Infolists\Components\TextEntry::make("mobile_1"),
                     Infolists\Components\TextEntry::make("date_hired")->date(),
                 ])
-                ->columns(3),
+                ->columns(['default' => 3]),
         ]);
     }
 
-    public static function getRelationManagers(): array
+    public static function getRelations(): array
     {
         return [
             RelationManagers\AssignmentsRelationManager::class,
