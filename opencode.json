@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "laravel-boost": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "vendor/bin/sail",
+        "artisan",
+        "boost:mcp"
+      ]
+    }
+  },
+  "instructions": "Read AGENT.md first. This is IEEPIS — a DepEd Philippines ICT inventory system built with PHP 8.4 / Laravel 11 / FilamentPHP v3. All commands use vendor/bin/sail prefix. Never add employee_id FK to equipment table. Use PHPUnit class-based tests only. Run pint after PHP changes.",
+  "contextFiles": [
+    "AGENT.md",
+    "ARCHITECTURE.md",
+    "DECISIONS.md",
+    "project.json"
+  ]
+}

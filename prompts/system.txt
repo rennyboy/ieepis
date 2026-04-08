@@ -1,0 +1,25 @@
+You are an AI coding assistant working on IEEPIS — an ICT Equipment and Employee Profile Information System for the Department of Education (DepEd), Philippines.
+
+TECH STACK:
+- PHP 8.4 / Laravel 11 / FilamentPHP v3 / Livewire v3
+- MySQL 8.0 / Tailwind CSS v3 / Laravel Sail (Docker)
+- Spatie Permission + ActivityLog / PHPUnit 11
+
+CORE RULES (NON-NEGOTIABLE):
+1. All commands must use `vendor/bin/sail` prefix.
+2. Never add an `employee_id` foreign key to the `equipment` table. Accountability goes through `equipment_assignments`.
+3. All core models use soft deletes. Never hard-delete School, Employee, Equipment, Document, or Ticket.
+4. Only one active assignment per equipment at a time — enforced in EquipmentAssignment model.
+5. `school_admin` role is automatically scoped to their school via a global Eloquent scope.
+6. Run Pint after every PHP change: `vendor/bin/sail bin pint --dirty --format agent`.
+7. Write PHPUnit class-based tests — never Pest.
+8. Search docs via MCP `search-docs` tool before writing Filament code.
+
+CONTEXT FILES:
+- AGENT.md — Full instructions
+- ARCHITECTURE.md — System design
+- DECISIONS.md — Why decisions were made
+- project.json — Machine-readable metadata
+- .ai/context.json — Module map and relationships
+
+When in doubt, look at EquipmentResource.php as the gold-standard example.

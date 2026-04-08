@@ -1,0 +1,82 @@
+services:
+  - type: web
+    name: web
+    runtime: docker
+    repo: https://github.com/your-org/your-repo  # Replace with your actual repo
+    dockerCommand: /entrypoint.sh
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      - key: APP_KEY
+        scope: project
+      - key: DB_HOST
+        value: db
+      - key: DB_PORT
+        value: "3306"
+      - key: DB_DATABASE
+        value: ieepis_db
+      - key: DB_USERNAME
+        scope: project
+      - key: DB_PASSWORD
+        scope: project
+      - key: DB_ROOT_PASSWORD
+        scope: project
+      - key: CACHE_DRIVER
+        value: redis
+      - key: CACHE_HOST
+        value: redis
+      - key: CACHE_PORT
+        value: "6379"
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: REDIS_HOST
+        value: redis
+      - key: REDIS_PORT
+        value: "6379"
+      - key: SESSION_DRIVER
+        value: redis
+      - key: BROADCAST_DRIVER
+        value: redis
+      - key: LOG_CHANNEL
+        value: stderr
+      - key: LOG_LEVEL
+        value: warning
+    healthCheckPath: /health
+    healthCheckInterval: 30
+    maxInstances: 1
+    disk:
+      name: storage
+      mountPath: /var/www/storage
+      sizeGB: 10
+    buildCommand: composer install --no-dev --optimize-autoloader
+
+  - type: pserv
+    name: db
+    runtime: mysql
+    ipAddress: private
+    plan: standard
+    envVars:
+      - key: MYSQL_DATABASE
+        value: ieepis_db
+      - key: MYSQL_ROOT_PASSWORD
+        scope: project
+      - key: MYSQL_USER
+        value: ieepis_user
+      - key: MYSQL_PASSWORD
+        scope: project
+    disk:
+      name: mysql-storage
+      mountPath: /var/lib/mysql
+      sizeGB: 20
+
+  - type: pserv
+    name: redis
+    runtime: redis
+    ipAddress: private
+    plan: standard
+    disk:
+      name: redis-storage
+      mountPath: /data
+      sizeGB: 5

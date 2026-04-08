@@ -1,0 +1,39 @@
+# IEEPIS — Windsurf AI Rules
+# This file is automatically read by Windsurf IDE's Cascade AI
+
+## Project Identity
+- Name: IEEPIS (ICT Equipment and Employee Profile Information System)
+- Purpose: DepEd Philippines school-division ICT inventory management
+- Stack: PHP 8.4 / Laravel 11 / FilamentPHP v3 / Livewire v3 / MySQL 8 / Tailwind v3
+- Dev Environment: Laravel Sail (Docker)
+
+## Mandatory Rules
+
+1. ALL commands use `vendor/bin/sail` prefix — never bare `php` or `composer` directly.
+2. NEVER add `employee_id` FK to the `equipment` table. Accountability is tracked via `equipment_assignments`.
+3. Core models (School, Employee, Equipment, Document, Ticket) use soft deletes — never hard delete.
+4. Only ONE active assignment per equipment — enforced in `EquipmentAssignment` model.
+5. `school_admin` role → restricted to their school by a global Eloquent scope. Never bypass.
+6. After every PHP change: `vendor/bin/sail bin pint --dirty --format agent`
+7. Write PHPUnit class-based tests — never Pest.
+8. Before writing Filament code: use MCP `search-docs` tool.
+
+## Context Files (Read Before Coding)
+- `AGENT.md` — full instructions, module map, rules
+- `ARCHITECTURE.md` — data model, request lifecycle, directory structure
+- `DECISIONS.md` — why key choices were made
+- `project.json` — machine-readable project metadata
+
+## Gold Standard Reference
+`app/Filament/Resources/EquipmentResource.php` — copy its structure for all new resources.
+
+## Module Map
+| Module | Model | Resource |
+|--------|-------|----------|
+| Schools | `App\Models\School` | `SchoolResource` |
+| Employees | `App\Models\Employee` | `EmployeeResource` |
+| Equipment | `App\Models\Equipment` | `EquipmentResource` |
+| Assignments | `App\Models\EquipmentAssignment` | `AssignmentResource` |
+| Documents | `App\Models\Document` | `DocumentResource` |
+| Tickets | `App\Models\Ticket` | `TicketResource` |
+| Connectivity | `App\Models\InternetConnection` | `InternetConnectionResource` |

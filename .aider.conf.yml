@@ -1,0 +1,41 @@
+## IEEPIS — Aider AI Configuration
+# https://aider.chat/docs/config/aider_conf.html
+
+# Model preferences
+# model: gemini/gemini-2.0-flash
+# weak-model: gemini/gemini-2.0-flash
+
+# Always read these files as context
+read:
+  - AGENT.md
+  - ARCHITECTURE.md
+  - DECISIONS.md
+  - project.json
+
+# Files to auto-include in every session
+# (add specific modules if working on them)
+# files:
+#   - app/Filament/Resources/EquipmentResource.php
+
+# Ignore these paths
+gitignore: true
+
+# Auto-apply Pint formatting after PHP changes
+# (Aider post-command hook — run manually if not supported)
+# after-commands:
+#   - vendor/bin/sail bin pint --dirty --format agent
+
+# Coding style hints (injected into system prompt)
+system-prompt: |
+  This is the IEEPIS project — ICT Equipment and Employee Profile Information System
+  for DepEd Philippines. Built with PHP 8.4 / Laravel 11 / FilamentPHP v3 / Livewire v3.
+
+  CRITICAL RULES:
+  - All commands use vendor/bin/sail prefix
+  - Never add employee_id FK to equipment table — use equipment_assignments
+  - Core models use soft deletes — never hard delete
+  - One active assignment per equipment enforced in model
+  - school_admin role is restricted by global Eloquent scope
+  - Run pint after PHP: vendor/bin/sail bin pint --dirty --format agent
+  - PHPUnit class-based tests only — never Pest
+  - Reference EquipmentResource.php as the gold-standard Filament pattern

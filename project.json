@@ -1,0 +1,157 @@
+{
+  "name": "ieepis",
+  "fullName": "ICT Equipment and Employee Profile Information System",
+  "acronym": "IEEPIS",
+  "version": "1.0.0",
+  "organization": "DepEd Philippines — School Division ICT Unit",
+  "architecture": "monolithic-laravel-filament",
+  "type": "admin-panel",
+  "primaryLanguage": "php",
+  "phpVersion": "8.4",
+  "framework": "laravel",
+  "frameworkVersion": "11",
+  "adminPanel": "filament",
+  "adminPanelVersion": "3",
+  "uiLibrary": "livewire",
+  "cssFramework": "tailwindcss",
+  "cssFrameworkVersion": "3",
+  "database": "mysql",
+  "databaseVersion": "8.0",
+  "devEnvironment": "laravel-sail",
+  "testFramework": "phpunit",
+  "testFrameworkVersion": "11",
+
+  "packages": {
+    "filament/filament": "^3.0",
+    "laravel/framework": "^11.0",
+    "laravel/socialite": "^5.0",
+    "livewire/livewire": "^3.0",
+    "spatie/laravel-permission": "*",
+    "spatie/laravel-activitylog": "*",
+    "simplesoftwareio/simple-qrcode": "*",
+    "barryvdh/laravel-dompdf": "*",
+    "maatwebsite/excel": "*"
+  },
+
+  "modules": [
+    {
+      "name": "schools",
+      "model": "App\\Models\\School",
+      "resource": "App\\Filament\\Resources\\SchoolResource",
+      "description": "Organizational unit — all data is scoped under a School"
+    },
+    {
+      "name": "employees",
+      "model": "App\\Models\\Employee",
+      "resource": "App\\Filament\\Resources\\EmployeeResource",
+      "description": "Teaching and non-teaching personnel per school"
+    },
+    {
+      "name": "equipment",
+      "model": "App\\Models\\Equipment",
+      "resource": "App\\Filament\\Resources\\EquipmentResource",
+      "description": "ICT equipment inventory — IEEPIS core module"
+    },
+    {
+      "name": "equipment_assignments",
+      "model": "App\\Models\\EquipmentAssignment",
+      "resource": "App\\Filament\\Resources\\AssignmentResource",
+      "description": "Accountability and transfer history — source of truth for who holds each device"
+    },
+    {
+      "name": "documents",
+      "model": "App\\Models\\Document",
+      "resource": "App\\Filament\\Resources\\DocumentResource",
+      "description": "PAR, ICS, IAR, DR, OR, SI, WMR, RRSP, RRPE receipts and documents"
+    },
+    {
+      "name": "tickets",
+      "model": "App\\Models\\Ticket",
+      "resource": "App\\Filament\\Resources\\TicketResource",
+      "description": "Support tickets linked to schools and equipment"
+    },
+    {
+      "name": "internet_connections",
+      "model": "App\\Models\\InternetConnection",
+      "resource": "App\\Filament\\Resources\\InternetConnectionResource",
+      "description": "ISP connectivity details per school"
+    },
+    {
+      "name": "districts",
+      "model": "App\\Models\\District",
+      "resource": "App\\Filament\\Resources\\DistrictResource",
+      "description": "School grouping within a division"
+    },
+    {
+      "name": "users",
+      "model": "App\\Models\\User",
+      "resource": "App\\Filament\\Resources\\UserResource",
+      "description": "Admin panel access accounts"
+    },
+    {
+      "name": "approved_users",
+      "model": "App\\Models\\ApprovedUser",
+      "resource": "App\\Filament\\Resources\\ApprovedUserResource",
+      "description": "Whitelist for Google OAuth registration"
+    }
+  ],
+
+  "roles": [
+    { "name": "super_admin", "scope": "all", "description": "Full unrestricted access" },
+    { "name": "sdo_admin", "scope": "division", "description": "All schools in the division" },
+    { "name": "school_admin", "scope": "school", "description": "Own school only — enforced via global Eloquent scope" },
+    { "name": "technician", "scope": "school", "description": "Tickets and equipment status updates" },
+    { "name": "viewer", "scope": "school", "description": "Read-only access" }
+  ],
+
+  "rules": [
+    "All commands must use vendor/bin/sail prefix",
+    "Never add employee_id FK to equipment — use equipment_assignments table",
+    "All core models use soft deletes",
+    "Equipment accountability enforces one active assignment at a time",
+    "school_admin role is restricted by global Eloquent scope",
+    "All mutations to School, Employee, Equipment are audit-logged",
+    "QR codes auto-generate on equipment creation via Observer",
+    "Ticket numbers auto-generate as TKT-YYYY-XXXX",
+    "Use PHPUnit class-based tests only — not Pest",
+    "Run pint after every PHP change: vendor/bin/sail bin pint --dirty --format agent"
+  ],
+
+  "entryPoints": {
+    "adminPanel": "/admin",
+    "login": "/admin/login",
+    "googleOAuth": "/auth/google"
+  },
+
+  "defaultCredentials": {
+    "note": "Change immediately in production",
+    "email": "admin@deped.gov.ph",
+    "password": "P@ssw0rd123"
+  },
+
+  "fileStorage": {
+    "base": "storage/app/public",
+    "schoolLogos": "storage/app/public/schools/logos",
+    "schoolDocuments": "storage/app/public/schools/{school_id}/documents",
+    "employeePhotos": "storage/app/public/employees/photos",
+    "documents": "storage/app/public/documents"
+  },
+
+  "aiContextFiles": [
+    "AGENT.md",
+    "ARCHITECTURE.md",
+    "DECISIONS.md",
+    "TASKS.md",
+    "project.json",
+    ".ai/context.json"
+  ],
+
+  "ideConfigs": {
+    "vscode": ".vscode/settings.json",
+    "cursor": ".cursor/mcp.json",
+    "opencode": "opencode.json",
+    "antigravity": "GEMINI.md",
+    "claude": "CLAUDE.md",
+    "jetbrains": ".editorconfig"
+  }
+}

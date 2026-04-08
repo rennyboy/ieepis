@@ -111,11 +111,29 @@ class Employee extends Model
     }
 
     /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Ticket>
+     */
+    public function tickets(): HasMany
+    {
+        return $this->hasMany(Ticket::class, "assigned_to_id");
+    }
+
+    /**
      * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Document>
      */
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class, "uploaded_by_id");
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
+        return "{$this->full_name} ({$this->employee_number})";
+    }
+
+    public function getCurrentEquipmentCountAttribute(): int
+    {
+        return $this->activeAssignments()->count();
     }
 
     public function scopeActive($query)
@@ -131,15 +149,5 @@ class Employee extends Model
     public function scopeNonTeaching($query)
     {
         return $query->where("employment_type", "non-teaching");
-    }
-
-    public function getDisplayNameAttribute(): string
-    {
-        return "{$this->full_name} ({$this->employee_number})";
-    }
-
-    public function getCurrentEquipmentCountAttribute(): int
-    {
-        return $this->activeAssignments()->count();
     }
 }

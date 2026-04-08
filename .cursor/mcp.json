@@ -1,0 +1,23 @@
+{
+  "$schema": "https://cursor.com/schema/mcp.json",
+  "mcp": {
+    "laravel-boost": {
+      "type": "local",
+      "enabled": true,
+      "command": ["vendor/bin/sail", "artisan", "boost:mcp"]
+    }
+  },
+  "contextFiles": [
+    "AGENT.md",
+    "ARCHITECTURE.md",
+    "DECISIONS.md",
+    "project.json",
+    ".ai/context.json"
+  ],
+  "ignore": [
+    "vendor/**",
+    "node_modules/**",
+    "storage/framework/**",
+    ".git/**"
+  ]
+}

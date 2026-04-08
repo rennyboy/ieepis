@@ -51,9 +51,11 @@ class Ticket extends Model
     {
         parent::boot();
         static::creating(function ($ticket) {
-            $ticket->ticket_number = self::generateTicketNumber(
-                $ticket->school_id,
-            );
+            if (!$ticket->ticket_number) {
+                $ticket->ticket_number = self::generateTicketNumber(
+                    $ticket->school_id,
+                );
+            }
         });
     }
 

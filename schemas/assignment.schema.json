@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IEEPIS Equipment Assignment Schema",
+  "description": "Schema for equipment accountability assignment records",
+  "type": "object",
+  "required": ["equipment_id", "accountable_officer_id", "transaction_type", "is_active"],
+  "properties": {
+    "id": {
+      "type": "integer"
+    },
+    "equipment_id": {
+      "type": "integer",
+      "description": "Foreign key to equipment table"
+    },
+    "accountable_officer_id": {
+      "type": "integer",
+      "description": "Employee responsible for the asset — PAR/ICS signatory"
+    },
+    "end_user_id": {
+      "type": ["integer", "null"],
+      "description": "Employee actually using the device (Custodian / End User)"
+    },
+    "transaction_type": {
+      "type": "string",
+      "enum": ["Beginning Inventory", "Issuance", "Transfer", "Return"],
+      "description": "Nature of this accountability transaction"
+    },
+    "document_reference": {
+      "type": ["string", "null"],
+      "description": "PAR No., ICS No., RRSP No., etc. referencing the physical document"
+    },
+    "is_active": {
+      "type": "boolean",
+      "description": "True = current active assignment. ONLY ONE per equipment allowed at any time."
+    },
+    "assigned_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date accountability took effect"
+    },
+    "receipt_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date equipment was physically received"
+    },
+    "remarks": {
+      "type": ["string", "null"],
+      "description": "Additional notes on this assignment"
+    }
+  },
+  "additionalProperties": false
+}

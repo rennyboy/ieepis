@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IEEPIS Equipment Schema",
+  "description": "Schema for ICT Equipment records in the IEEPIS system",
+  "type": "object",
+  "required": ["property_no", "item_type", "brand", "model", "school_id"],
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "Auto-incremented primary key"
+    },
+    "school_id": {
+      "type": "integer",
+      "description": "Foreign key to schools table"
+    },
+    "property_no": {
+      "type": "string",
+      "description": "Official DepEd property number"
+    },
+    "old_property_no": {
+      "type": ["string", "null"],
+      "description": "Previous property number for bundled items"
+    },
+    "serial_no": {
+      "type": ["string", "null"],
+      "description": "Manufacturer serial number"
+    },
+    "brand": {
+      "type": "string",
+      "description": "Equipment brand/manufacturer"
+    },
+    "model": {
+      "type": "string",
+      "description": "Equipment model name"
+    },
+    "item_type": {
+      "type": "string",
+      "enum": ["Device Type", "Equipment", "Hardware", "Software", "Peripherals"],
+      "description": "IEEPIS item type classification"
+    },
+    "is_dcp": {
+      "type": "boolean",
+      "description": "DepEd Computerization Program flag"
+    },
+    "dcp_package": {
+      "type": ["string", "null"],
+      "description": "DCP batch name and year (e.g. 'Phase III 2022')"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["High-Value", "Low-Value"],
+      "description": "High-Value ≥ ₱50,000 | Low-Value < ₱50,000"
+    },
+    "gl_sl_code": {
+      "type": ["string", "null"],
+      "description": "Subsidiary Ledger Chart of Accounts code (COA compliance)"
+    },
+    "uacs_code": {
+      "type": ["string", "null"],
+      "description": "Unified Accounts Code Structure code"
+    },
+    "acquisition_cost": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "Purchase price in Philippine Peso"
+    },
+    "acquisition_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date of acquisition (YYYY-MM-DD)"
+    },
+    "mode_of_acquisition": {
+      "type": ["string", "null"],
+      "enum": ["Purchased", "Donation", "Grant", null],
+      "description": "How the equipment was acquired"
+    },
+    "condition": {
+      "type": "string",
+      "enum": ["Good", "Fair", "Poor", "Unserviceable"],
+      "description": "Physical condition of the equipment"
+    },
+    "functional_status": {
+      "type": "string",
+      "enum": ["Functional", "Non-Functional"],
+      "description": "Whether the device works or not"
+    },
+    "accountability_status": {
+      "type": "string",
+      "enum": ["Normal", "Transferred", "Stolen", "Lost", "Damaged", "For Disposal"],
+      "description": "Current accountability status"
+    },
+    "warranty_expiry": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Date warranty expires — alert triggers 90 days before"
+    },
+    "qr_code_path": {
+      "type": ["string", "null"],
+      "description": "Path to auto-generated QR code image (set by Observer — do not set manually)"
+    },
+    "deleted_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Soft delete timestamp — null means active record"
+    }
+  },
+  "additionalProperties": false
+}

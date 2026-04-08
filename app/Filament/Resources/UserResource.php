@@ -18,6 +18,7 @@ use Filament\Tables\Actions\ForceDeleteAction;
 use Filament\Tables\Actions\RestoreAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Notifications\Notification;
 
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -54,7 +55,7 @@ class UserResource extends Resource
                 ->password()
                 ->required()
                 ->minLength(8)
-                        ->hiddenOn("edit")
+                ->hiddenOn("edit")
                 ->dehydrateStateUsing(fn($state) => Hash::make($state)),
             Select::make("school_id")
                 ->label("School")
@@ -145,7 +146,12 @@ class UserResource extends Resource
                             return $query->whereHas("roles", function (
                                 Builder $subQuery,
                             ) use ($data) {
-                                $subQuery->where(fn(Builder $q) => $q->where("name", $data["value"]));
+                                $subQuery->where(
+                                    fn(Builder $q) => $q->where(
+                                        "name",
+                                        $data["value"],
+                                    ),
+                                );
                             });
                         }
                         return $query;
@@ -153,6 +159,89 @@ class UserResource extends Resource
             ])
             ->actions([
                 EditAction::make(),
+                Action::make("transfer")
+                    ->icon("heroicon-o-arrow-path")
+                    ->modalHeading("Transfer / Reassign User")
+                    ->form([
+                        TextInput::make("name")
+                            ->label("Full name")
+                            ->required()
+                            ->default(fn($record) => $record->name ?? null),
+                        TextInput::make("email")
+                            ->label("Email (leave blank to keep)")
+                            ->email()
+                            ->nullable(),
+                        Select::make("school_id")
+                            ->label("School")
+                            ->options(
+                                fn(): array => School::pluck(
+                                    "name",
+                                    "id",
+                                )->toArray(),
+                            )
+                            ->nullable(),
+                        Forms\Components\Select::make("roles")
+                            ->label("Roles")
+                            ->multiple()
+                            ->options(
+                                fn(): array => Role::all()
+                                    ->pluck("name", "name")
+                                    ->toArray(),
+                            )
+                            ->nullable(),
+                    ])
+                    ->action(function (User $record, array $data) {
+                        // Keep a copy of original for audit if needed
+                        $original = $record->replicate();
+
+                        $record->update([
+                            "name" => $data["name"],
+                            "email" => $data["email"] ?? $record->email,
+                            "school_id" =>
+                                $data["school_id"] ?? $record->school_id,
+                        ]);
+
+                        if (isset($data["roles"])) {
+                            $record->syncRoles($data["roles"]);
+                        }
+
+                        // Notify the affected user and relevant admins via database notifications
+                        $recipients = \Illuminate\Support\Collection::make([
+                            $record,
+                        ]);
+
+                        $admins = User::query()
+                            ->whereHas("roles", function ($q) {
+                                $q->whereIn("name", [
+                                    "super-admin",
+                                    "sdo-admin",
+                                ]);
+                            })
+                            ->get();
+
+                        $recipients = $recipients
+                            ->merge($admins)
+                            ->unique("id")
+                            ->values();
+
+                        Notification::make()
+                            ->title("Account reassigned")
+                            ->body(
+                                "Your account has been reassigned to \"{$record->school?->name}\". If this was unexpected, please contact your administrator.",
+                            )
+                            ->icon("heroicon-o-user")
+                            ->sendToDatabase($recipients);
+
+                        // Give the acting admin immediate feedback in the UI
+                        \Filament\Notifications\Notification::make()
+                            ->title("User reassigned")
+                            ->success()
+                            ->send();
+                    })
+                    ->visible(
+                        fn($record) => $record instanceof User &&
+                            !$record->hasRole("super-admin"),
+                    ),
                 Action::make("assignRole")
                     ->icon("heroicon-o-user-plus")
                     ->form([

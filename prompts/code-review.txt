@@ -1,0 +1,46 @@
+You are reviewing a code change for the IEEPIS Laravel application.
+
+REVIEW CHECKLIST:
+
+## PHP / Laravel Quality
+- [ ] PHP 8.4 features used where appropriate (constructor promotion, match, named args)
+- [ ] Explicit return types on all methods
+- [ ] Type hints on all parameters
+- [ ] Curly braces on all control structures
+- [ ] PHPDoc blocks instead of inline comments
+- [ ] No raw SQL — use Eloquent query builder
+
+## Architecture
+- [ ] No business logic in controllers (use service classes or model methods)
+- [ ] No `employee_id` FK added to `equipment` table
+- [ ] Soft deletes respected — no hard deletes on core models
+- [ ] School scope not bypassed without an explicit reason
+
+## Filament
+- [ ] `static::make()` used for component initialization
+- [ ] Form uses `Forms\Components` namespace
+- [ ] Table uses `Tables\Columns` namespace
+- [ ] `relationship()` used on Select for FK fields
+- [ ] Authorization implemented (`canViewAny`, `canCreate`, `canEdit`, `canDelete`)
+
+## Security
+- [ ] No user input passed to raw queries
+- [ ] Authorization checked before every mutation
+- [ ] School admin cannot access other schools' data
+
+## Testing
+- [ ] PHPUnit class-based test (not Pest)
+- [ ] Happy path covered
+- [ ] Failure path covered
+- [ ] School scope isolation tested
+- [ ] Factory used for test data (not manual inserts)
+
+## Code Style
+- [ ] Pint was run: `vendor/bin/sail bin pint --dirty --format agent`
+- [ ] Descriptive method names (isAssignedToTechnician, not assigned())
+- [ ] No debug leftovers (dd, dump, var_dump, console.log)
+
+## Performance
+- [ ] No N+1 queries — use eager loading (`->with([...])`)
+- [ ] Pagination on all table queries
+- [ ] Indexes on foreign keys and frequently filtered columns

@@ -1,0 +1,150 @@
+{
+  "version": "1.0",
+  "generated": "2026-04-07",
+  "project": "IEEPIS",
+  "description": "ICT Equipment and Employee Profile Information System for DepEd Philippines",
+
+  "modules": {
+    "schools": {
+      "model": "App\\Models\\School",
+      "table": "schools",
+      "resource": "App\\Filament\\Resources\\SchoolResource",
+      "softDeletes": true,
+      "audited": true,
+      "globalScope": false,
+      "relationships": {
+        "hasMany": ["employees", "equipment", "documents", "tickets", "internet_connections"],
+        "belongsTo": ["districts"]
+      },
+      "keyFields": ["name", "school_id", "district_id", "school_head", "governance_level"]
+    },
+    "employees": {
+      "model": "App\\Models\\Employee",
+      "table": "employees",
+      "resource": "App\\Filament\\Resources\\EmployeeResource",
+      "softDeletes": true,
+      "audited": true,
+      "globalScope": "school",
+      "relationships": {
+        "belongsTo": ["schools"],
+        "hasMany": ["equipment_assignments"]
+      },
+      "keyFields": ["employee_id", "last_name", "first_name", "position", "employment_type", "is_teaching"]
+    },
+    "equipment": {
+      "model": "App\\Models\\Equipment",
+      "table": "equipment",
+      "resource": "App\\Filament\\Resources\\EquipmentResource",
+      "softDeletes": true,
+      "audited": true,
+      "globalScope": "school",
+      "hasQrCode": true,
+      "relationships": {
+        "belongsTo": ["schools"],
+        "hasMany": ["equipment_assignments", "documents"],
+        "hasOne": ["active_assignment"]
+      },
+      "keyFields": [
+        "property_no", "old_property_no", "serial_no", "brand", "model",
+        "item_type", "is_dcp", "dcp_package", "category", "condition",
+        "functional_status", "accountability_status", "acquisition_cost",
+        "acquisition_date", "mode_of_acquisition", "warranty_expiry"
+      ],
+      "importantRules": [
+        "No employee_id FK on this table",
+        "Accountability tracked via equipment_assignments only",
+        "QR code auto-generated on creation by Observer"
+      ]
+    },
+    "equipment_assignments": {
+      "model": "App\\Models\\EquipmentAssignment",
+      "table": "equipment_assignments",
+      "resource": "App\\Filament\\Resources\\AssignmentResource",
+      "softDeletes": false,
+      "audited": false,
+      "globalScope": "school",
+      "relationships": {
+        "belongsTo": ["equipment", "employees (accountable_officer)", "employees (end_user)"]
+      },
+      "keyFields": [
+        "equipment_id", "accountable_officer_id", "end_user_id",
+        "transaction_type", "document_reference", "is_active",
+        "assigned_date", "receipt_date"
+      ],
+      "importantRules": [
+        "Only one active assignment per equipment at a time",
+        "transaction_type: Beginning Inventory | Issuance | Transfer | Return"
+      ]
+    },
+    "documents": {
+      "model": "App\\Models\\Document",
+      "table": "documents",
+      "resource": "App\\Filament\\Resources\\DocumentResource",
+      "softDeletes": true,
+      "audited": false,
+      "globalScope": "school",
+      "relationships": {
+        "belongsTo": ["schools", "equipment", "employees"],
+        "morphTo": ["documentable"]
+      },
+      "keyFields": ["document_type", "document_number", "file_path", "linked_to"]
+    },
+    "tickets": {
+      "model": "App\\Models\\Ticket",
+      "table": "tickets",
+      "resource": "App\\Filament\\Resources\\TicketResource",
+      "softDeletes": true,
+      "audited": false,
+      "globalScope": "school",
+      "relationships": {
+        "belongsTo": ["schools", "equipment", "employees (reporter)", "users (technician)"]
+      },
+      "keyFields": [
+        "ticket_number", "priority", "status", "description",
+        "resolution_notes", "resolved_at"
+      ],
+      "importantRules": [
+        "Ticket numbers auto-generated as TKT-YYYY-XXXX",
+        "priority: Low | Medium | High | Critical",
+        "status: Open | In-Progress | Pending | Resolved | Closed"
+      ]
+    },
+    "internet_connections": {
+      "model": "App\\Models\\InternetConnection",
+      "table": "internet_connections",
+      "resource": "App\\Filament\\Resources\\InternetConnectionResource",
+      "softDeletes": false,
+      "audited": false,
+      "globalScope": "school",
+      "relationships": {
+        "belongsTo": ["schools"]
+      },
+      "keyFields": [
+        "isp", "plan", "account_number", "connection_type",
+        "contracted_download_speed", "contracted_upload_speed",
+        "actual_download_speed", "actual_upload_speed", "monthly_cost"
+      ]
+    }
+  },
+
+  "globalPatterns": {
+    "softDeleteModels": ["School", "Employee", "Equipment", "Document", "Ticket"],
+    "auditedModels": ["School", "Employee", "Equipment"],
+    "schoolScopedModels": ["Employee", "Equipment", "EquipmentAssignment", "Document", "Ticket", "InternetConnection"],
+    "observerDriven": ["Equipment (QR code)", "Ticket (auto ticket number)"]
+  },
+
+  "artisanCommands": {
+    "ieepis:generate-qrcodes": "Generate QR codes for all equipment missing them",
+    "ieepis:export-inventory": "Export full inventory to Excel",
+    "ieepis:check-warranties": "Flag equipment with warranty expiring within 90 days"
+  },
+
+  "testingConventions": {
+    "framework": "PHPUnit",
+    "style": "class-based",
+    "command": "vendor/bin/sail artisan test --compact",
+    "filterCommand": "vendor/bin/sail artisan test --compact --filter=TestName",
+    "makeCommand": "vendor/bin/sail artisan make:test --phpunit {Name}Test"
+  }
+}
