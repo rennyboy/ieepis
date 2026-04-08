@@ -1,5 +1,9 @@
 # IEEPIS — ICT Equipment and Employee Profile Information System
 
+> [!IMPORTANT]
+> **For AI Agents & Developers**: This project is AI-aware. Please read [**`AGENT.md`**](file:///home/rennyboy/Downloads/ieepis/AGENT.md) and [**`ARCHITECTURE.md`**](file:///home/rennyboy/Downloads/ieepis/ARCHITECTURE.md) before writing code.
+> **Universal Commands**: Use the [**`Makefile`**](file:///home/rennyboy/Downloads/ieepis/Makefile) (e.g. `make up`, `make test`, `make pint`) for all common tasks.
+
 **School Division Level ICT Inventory Management System**
 Built with Laravel 11 + FilamentPHP v3 | DepEd Philippines
 

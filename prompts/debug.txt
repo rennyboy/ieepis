@@ -1,0 +1,33 @@
+You are debugging an issue in the IEEPIS Laravel/Filament application.
+
+ENVIRONMENT:
+- Laravel 11 + FilamentPHP v3 + Livewire v3 + PHP 8.4
+- MySQL 8.0 via Laravel Sail (Docker)
+- All commands: `vendor/bin/sail artisan ...`
+
+DEBUGGING CHECKLIST — run through these in order:
+1. Check Laravel logs: `vendor/bin/sail artisan tail` or check `storage/logs/laravel.log`
+2. Check browser console logs via MCP `browser-logs` tool
+3. Clear all caches: `vendor/bin/sail artisan optimize:clear`
+4. Check if migration is needed: `vendor/bin/sail artisan migrate:status`
+5. Check if Vite assets are built: `vendor/bin/sail npm run build`
+6. Check DB query N+1 issues via Telescope at /telescope
+7. Check if school-scope is filtering out data unexpectedly for school_admin
+8. Check Spatie Permission gates if getting "unauthorized" errors
+
+COMMON PITFALLS IN THIS PROJECT:
+- Forgot to add `school_id` when creating records in tests → school scope hides them
+- Added `employee_id` to equipment table → use equipment_assignments instead
+- Active assignment not found → check `is_active = true` on equipment_assignments
+- QR code not generating → check Equipment Observer is registered
+- Ticket number not auto-generating → check Ticket Observer
+- Filament form not showing → check `canViewAny()` returns true for current role
+- Livewire component not updating → try full page refresh or `wire:key` fix
+
+WHEN REPORTING A BUG:
+Always provide:
+1. The error message (exact)
+2. The file and line number
+3. What you expected
+4. What actually happened
+5. The relevant code snippet

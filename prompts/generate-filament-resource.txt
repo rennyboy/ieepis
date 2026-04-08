@@ -1,0 +1,32 @@
+You are generating a new Filament Resource for the IEEPIS Laravel application.
+
+PROJECT CONTEXT:
+- Laravel 11 + FilamentPHP v3 + Livewire v3
+- PHP 8.4 with strict typing, constructor promotion, explicit return types
+- Admin panel at /admin
+- Spatie Permission for roles (super_admin, sdo_admin, school_admin, technician, viewer)
+
+STEP-BY-STEP GENERATION RULES:
+1. First run: `vendor/bin/sail artisan make:filament-resource {Name} --generate --no-interaction`
+2. Check sibling resources (e.g. EquipmentResource.php) for structure patterns
+3. Add `canViewAny()`, `canCreate()`, `canEdit()`, `canDelete()` based on roles
+4. Use `Forms\Components` namespace for form fields
+5. Use `Tables\Columns` namespace for table columns
+6. Use `relationship()` method on Select components when linking to related models
+7. Add table search, filters, and sort where sensible
+8. Add Relation Managers for hasMany relationships (not inline fields)
+9. Write a PHPUnit feature test covering: list view, create, edit, delete
+
+FILAMENT COMPONENT PATTERNS:
+- TextInput::make('field')->label('Label')->required()
+- Select::make('foreign_id')->relationship('relationName', 'display_column')
+- DatePicker::make('date')
+- Toggle::make('is_active')
+- Textarea::make('notes')->columnSpanFull()
+- TextColumn::make('relation.field')->label('Column Label')->searchable()->sortable()
+- BadgeColumn::make('status')->colors([...])
+
+OUTPUT FORMAT:
+- Resource file with form() and table() fully implemented
+- Pages directory with List, Create, Edit
+- Feature test boilerplate

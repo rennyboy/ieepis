@@ -1,0 +1,92 @@
+You are writing a PHPUnit feature test for the IEEPIS Laravel/Filament application.
+
+FRAMEWORK: PHPUnit 11 (NOT Pest — class-based tests only)
+ENVIRONMENT: Laravel 11 + FilamentPHP v3 + Livewire v3
+
+CREATE TEST: `vendor/bin/sail artisan make:test --phpunit {Name}Test`
+RUN TEST: `vendor/bin/sail artisan test --compact --filter={TestName}`
+
+TEST STRUCTURE TEMPLATE:
+```php
+<?php
+
+namespace Tests\Feature;
+
+use App\Filament\Resources\{Resource}\Pages\{List|Create|Edit};
+use App\Models\{Model};
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+class {Name}Test extends TestCase
+{
+    use RefreshDatabase;
+
+    protected User $adminUser;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->adminUser = User::factory()->create();
+        $this->adminUser->assignRole('super_admin');
+        $this->actingAs($this->adminUser);
+    }
+
+    public function test_can_list_{models}(): void
+    {
+        $records = {Model}::factory(5)->create();
+
+        Livewire::test(List{Model}::class)
+            ->assertCanSeeTableRecords($records);
+    }
+
+    public function test_can_create_{model}(): void
+    {
+        $newData = {Model}::factory()->make();
+
+        Livewire::test(Create{Model}::class)
+            ->fillForm([
+                'field' => $newData->field,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('{table}', ['field' => $newData->field]);
+    }
+
+    public function test_can_edit_{model}(): void
+    {
+        $record = {Model}::factory()->create();
+
+        Livewire::test(Edit{Model}::class, ['record' => $record->id])
+            ->fillForm(['field' => 'updated value'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('{table}', ['field' => 'updated value']);
+    }
+
+    public function test_school_admin_cannot_see_other_school_{models}(): void
+    {
+        // Test school scope isolation
+        $otherSchool = School::factory()->create();
+        $otherRecord = {Model}::factory()->for($otherSchool)->create();
+
+        $schoolAdmin = User::factory()->create();
+        $schoolAdmin->assignRole('school_admin');
+        $this->actingAs($schoolAdmin);
+
+        Livewire::test(List{Model}::class)
+            ->assertCanNotSeeTableRecords([$otherRecord]);
+    }
+}
+```
+
+TEST COVERAGE REQUIREMENTS:
+- Happy path: list, create, edit, (soft) delete
+- Validation failures: required fields, unique constraints
+- Authorization: school_admin scope isolation
+- Role-based: technician/viewer cannot create/edit
+- Business rules: one active assignment per equipment, etc.

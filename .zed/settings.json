@@ -1,0 +1,55 @@
+{
+  "assistant": {
+    "instructions": "Read AGENT.md first. This is IEEPIS — a DepEd Philippines ICT inventory management system. PHP 8.4 / Laravel 11 / FilamentPHP v3 / Livewire v3. All terminal commands use vendor/bin/sail prefix. Never add employee_id FK to equipment table. PHPUnit class-based tests only. Run pint after PHP changes: vendor/bin/sail bin pint --dirty --format agent."
+  },
+  "lsp": {
+    "intelephense": {
+      "initialization_options": {
+        "licenceKey": "",
+        "settings": {
+          "environment": {
+            "phpVersion": "8.4"
+          },
+          "files": {
+            "exclude": [
+              "**/.git/**",
+              "**/vendor/**",
+              "**/node_modules/**",
+              "**/storage/framework/**"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "tasks": [
+    {
+      "label": "Sail: Up",
+      "command": "vendor/bin/sail up -d"
+    },
+    {
+      "label": "Sail: Stop",
+      "command": "vendor/bin/sail stop"
+    },
+    {
+      "label": "Sail: Run Tests",
+      "command": "vendor/bin/sail artisan test --compact"
+    },
+    {
+      "label": "Sail: Dev Server",
+      "command": "vendor/bin/sail npm run dev"
+    },
+    {
+      "label": "Pint: Fix Style",
+      "command": "vendor/bin/sail bin pint --dirty --format agent"
+    },
+    {
+      "label": "Sail: Clear Cache",
+      "command": "vendor/bin/sail artisan optimize:clear"
+    },
+    {
+      "label": "Sail: Migrate Fresh",
+      "command": "vendor/bin/sail artisan migrate:fresh --seed"
+    }
+  ]
+}

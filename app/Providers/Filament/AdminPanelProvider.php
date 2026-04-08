@@ -80,7 +80,10 @@ class AdminPanelProvider extends PanelProvider
                 in: app_path("Filament/Pages"),
                 for: "App\\Filament\\Pages",
             )
-            ->pages([Pages\Dashboard::class])
+            ->pages([
+                Pages\Dashboard::class,
+                \App\Filament\Pages\DcpDashboard::class,
+            ])
             ->discoverWidgets(
                 in: app_path("Filament/Widgets"),
                 for: "App\\Filament\\Widgets",
@@ -116,19 +119,19 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 "panels::auth.login.after",
-                fn () => view("auth.google-button-login")
+                fn() => view("auth.google-button-login"),
             )
             ->renderHook(
                 "panels::auth.login.form.after",
-                fn () => view("auth.google-button-login")
+                fn() => view("auth.google-button-login"),
             )
             ->renderHook(
                 "panels::auth.register.after",
-                fn () => view("auth.google-button-register")
+                fn() => view("auth.google-button-register"),
             )
             ->renderHook(
                 "panels::auth.register.form.after",
-                fn () => view("auth.google-button-register")
+                fn() => view("auth.google-button-register"),
             )
             // ✅ Keep render hook for user info in minimal top bar
             ->renderHook(

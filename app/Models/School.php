@@ -107,7 +107,6 @@ class School extends Model
         "travel_time_minutes",
         "is_very_remote",
         "is_gidca",
-        "gidca_type",
         "recent_developments",
         "status",
         "network_administrator_id",

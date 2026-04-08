@@ -1,34 +1,53 @@
+version: "3.9"
+
 services:
-  # PHP Application
-  app:
+  # Web Application (Nginx + PHP-FPM + Supervisor)
+  # This is the main service Render will route HTTP traffic to
+  web:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: ieepis-app
     restart: unless-stopped
     working_dir: /var/www
+    environment:
+      APP_ENV: production
+      APP_DEBUG: false
+      APP_KEY: ${APP_KEY:-base64:}
+      APP_URL: ${APP_URL:-http://localhost:8080}
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-ieepis_db}
+      DB_USERNAME: ${DB_USERNAME:-ieepis_user}
+      DB_PASSWORD: ${DB_PASSWORD:-ieepis_password}
+      CACHE_DRIVER: redis
+      CACHE_HOST: redis
+      CACHE_PORT: 6379
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      SESSION_DRIVER: redis
+      SESSION_CONNECTION: default
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: warning
+    ports:
+      - "8080:8080"
     volumes:
-      - ./:/var/www
       - ./storage:/var/www/storage
+      - ./bootstrap/cache:/var/www/bootstrap/cache
     networks:
       - ieepis-network
     depends_on:
       - db
-
-  # Nginx Web Server
-  nginx:
-    image: nginx:alpine
-    container_name: ieepis-nginx
-    restart: unless-stopped
-    ports:
-      - "8080:80"
-    volumes:
-      - ./:/var/www
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
-    networks:
-      - ieepis-network
-    depends_on:
-      - app
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # MySQL Database
   db:
@@ -36,26 +55,73 @@ services:
     container_name: ieepis-db
     restart: unless-stopped
     environment:
-      MYSQL_DATABASE: ieepis_db
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_USER: ieepis_user
-      MYSQL_PASSWORD: ieepis_password
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${DB_DATABASE:-ieepis_db}
+      MYSQL_USER: ${DB_USERNAME:-ieepis_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-ieepis_password}
+      MYSQL_ALLOW_EMPTY_PASSWORD: "false"
     volumes:
       - db-data:/var/lib/mysql
-    ports:
-      - "3307:3306"
     networks:
       - ieepis-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Redis (for cache/sessions)
+  # Redis Cache/Session/Queue
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     container_name: ieepis-redis
     restart: unless-stopped
-    ports:
-      - "6380:6379"
+    command: redis-server ${REDIS_COMMAND:-}
     networks:
       - ieepis-network
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional: Laravel Queue Worker (uncomment to enable background jobs)
+  # worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: ieepis-worker
+  #   restart: unless-stopped
+  #   working_dir: /var/www
+  #   environment:
+  #     APP_ENV: production
+  #     APP_DEBUG: false
+  #     APP_KEY: ${APP_KEY:-base64:}
+  #     DB_CONNECTION: mysql
+  #     DB_HOST: db
+  #     DB_PORT: 3306
+  #     DB_DATABASE: ${DB_DATABASE:-ieepis_db}
+  #     DB_USERNAME: ${DB_USERNAME:-ieepis_user}
+  #     DB_PASSWORD: ${DB_PASSWORD:-ieepis_password}
+  #     CACHE_DRIVER: redis
+  #     CACHE_HOST: redis
+  #     CACHE_PORT: 6379
+  #     QUEUE_CONNECTION: redis
+  #     REDIS_HOST: redis
+  #     REDIS_PORT: 6379
+  #     REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+  #     LOG_CHANNEL: stderr
+  #     LOG_LEVEL: warning
+  #   command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600
+  #   networks:
+  #     - ieepis-network
+  #   depends_on:
+  #     - db
+  #     - redis
+  #   volumes:
+  #     - ./storage:/var/www/storage
+  #     - ./bootstrap/cache:/var/www/bootstrap/cache
 
 networks:
   ieepis-network:
@@ -63,4 +129,6 @@ networks:
 
 volumes:
   db-data:
+    driver: local
+  redis-data:
     driver: local
