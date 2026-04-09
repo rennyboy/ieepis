@@ -4,6 +4,7 @@
 /public/storage
 /storage/*.key
 /vendor
+database/database.sqlite
 .env
 .env.backup
 .env.production
@@ -16,6 +17,7 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+AppData/
 
 # Build files
 /public/build
