@@ -15,9 +15,13 @@ use Illuminate\Support\Facades\Auth;
 class InternetConnectionResource extends Resource
 {
     protected static ?string $model = InternetConnection::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-signal';
-    protected static ?string $navigationGroup = 'Monitoring';
-    protected static ?int $navigationSort = 6;
+
+    protected static ?string $navigationGroup = 'ICT Inventory';
+
+    protected static ?int $navigationSort = 4;
+
     protected static ?string $navigationLabel = 'Connectivity';
 
     public static function form(Form $form): Form
@@ -84,9 +88,9 @@ class InternetConnectionResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListInternetConnections::route('/'),
+            'index' => Pages\ListInternetConnections::route('/'),
             'create' => Pages\CreateInternetConnection::route('/create'),
-            'edit'   => Pages\EditInternetConnection::route('/{record}/edit'),
+            'edit' => Pages\EditInternetConnection::route('/{record}/edit'),
         ];
     }
 
@@ -98,8 +102,8 @@ class InternetConnectionResource extends Resource
         $query = parent::getEloquentQuery();
 
         $query->when(
-            fn() => $user->hasRole(["school-admin", "technician"]),
-            fn(Builder $q) => $q->where("school_id", $user->school_id),
+            fn () => $user->hasRole(['school-admin', 'technician']),
+            fn (Builder $q) => $q->where('school_id', $user->school_id),
         );
 
         return $query;
