@@ -9,18 +9,22 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Table;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
 class ApprovedUserResource extends Resource
 {
     protected static ?string $model = ApprovedUser::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-check-badge';
+
     protected static ?string $navigationGroup = 'Settings';
+
     protected static ?string $navigationLabel = 'User Approvals';
-    protected static ?int $navigationSort = 10;
+
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {
@@ -152,7 +156,7 @@ class ApprovedUserResource extends Resource
         /** @var User|null $user */
         $user = Auth::user();
 
-        if (!($user instanceof User)) {
+        if (! ($user instanceof User)) {
             return false;
         }
 
@@ -166,7 +170,7 @@ class ApprovedUserResource extends Resource
         $query = parent::getEloquentQuery();
 
         if ($user instanceof User && $user->hasRole('division-admin') && $user->division) {
-            $query->where(fn(Builder $q) => $q->where('division', $user->division));
+            $query->where(fn (Builder $q) => $q->where('division', $user->division));
         }
 
         return $query;
