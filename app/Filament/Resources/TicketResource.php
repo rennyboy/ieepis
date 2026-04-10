@@ -21,96 +21,100 @@ class TicketResource extends Resource
         $query = parent::getEloquentQuery();
 
         $query->when(
-            fn() => $user->hasRole("school-admin"),
-            fn(Builder $q) => $q->where("school_id", $user->school_id),
+            fn () => $user->hasRole('school-admin'),
+            fn (Builder $q) => $q->where('school_id', $user->school_id),
         );
 
         return $query;
     }
 
     protected static ?string $model = Ticket::class;
-    protected static ?string $navigationIcon = "heroicon-o-ticket";
-    protected static ?string $navigationGroup = "Monitoring";
-    protected static ?int $navigationSort = 7;
-    protected static ?string $navigationBadgeColor = "danger";
+
+    protected static ?string $navigationIcon = 'heroicon-o-ticket';
+
+    protected static ?string $navigationGroup = 'Support';
+
+    protected static ?int $navigationSort = 1;
+
+    protected static ?string $navigationBadgeColor = 'danger';
 
     public static function getNavigationBadge(): ?string
     {
-        $count = static::getModel()
-            ::whereIn("status", ["open", "in-progress"])
+        $count = static::getModel()::whereIn('status', ['open', 'in-progress'])
             ->count();
+
         return $count > 0 ? (string) $count : null;
     }
 
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\Section::make("Ticket Information")
+            Forms\Components\Section::make('Ticket Information')
                 ->schema([
-                    Forms\Components\TextInput::make("ticket_number")
-                        ->label("Ticket No.")
+                    Forms\Components\TextInput::make('ticket_number')
+                        ->label('Ticket No.')
                         ->disabled()
                         ->dehydrated(false),
-                    Forms\Components\Select::make("school_id")
-                        ->label("School")
-                        ->relationship("school", "name")
+                    Forms\Components\Select::make('school_id')
+                        ->label('School')
+                        ->relationship('school', 'name')
                         ->searchable()
                         ->preload()
                         ->required(),
-                    Forms\Components\Select::make("equipment_id")
-                        ->label("Related Equipment")
-                        ->relationship("equipment", "model")
+                    Forms\Components\Select::make('equipment_id')
+                        ->label('Related Equipment')
+                        ->relationship('equipment', 'model')
                         ->searchable()
                         ->preload()
                         ->nullable(),
-                    Forms\Components\Select::make("reporter_id")
-                        ->label("Reported By")
-                        ->relationship("reporter", "full_name")
+                    Forms\Components\Select::make('reporter_id')
+                        ->label('Reported By')
+                        ->relationship('reporter', 'full_name')
                         ->searchable()
                         ->preload()
                         ->required(),
-                    Forms\Components\TextInput::make("issue_title")
-                        ->label("Issue Title")
+                    Forms\Components\TextInput::make('issue_title')
+                        ->label('Issue Title')
                         ->required()
                         ->columnSpanFull(),
-                    Forms\Components\Textarea::make("description")
+                    Forms\Components\Textarea::make('description')
                         ->rows(3)
                         ->columnSpanFull(),
                 ])
                 ->columns(['default' => 2]),
 
-            Forms\Components\Section::make("Status & Assignment")
+            Forms\Components\Section::make('Status & Assignment')
                 ->schema([
-                    Forms\Components\Select::make("priority")
+                    Forms\Components\Select::make('priority')
                         ->options([
-                            "low" => "Low",
-                            "medium" => "Medium",
-                            "high" => "High",
-                            "critical" => "Critical",
+                            'low' => 'Low',
+                            'medium' => 'Medium',
+                            'high' => 'High',
+                            'critical' => 'Critical',
                         ])
                         ->required()
-                        ->default("medium"),
-                    Forms\Components\Select::make("status")
+                        ->default('medium'),
+                    Forms\Components\Select::make('status')
                         ->options([
-                            "open" => "Open",
-                            "in-progress" => "In Progress",
-                            "pending" => "Pending",
-                            "resolved" => "Resolved",
-                            "closed" => "Closed",
+                            'open' => 'Open',
+                            'in-progress' => 'In Progress',
+                            'pending' => 'Pending',
+                            'resolved' => 'Resolved',
+                            'closed' => 'Closed',
                         ])
                         ->required()
-                        ->default("open"),
-                    Forms\Components\Select::make("assigned_to_id")
-                        ->label("Assigned Technician")
-                        ->relationship("assignedTo", "full_name")
+                        ->default('open'),
+                    Forms\Components\Select::make('assigned_to_id')
+                        ->label('Assigned Technician')
+                        ->relationship('assignedTo', 'full_name')
                         ->searchable()
                         ->preload()
                         ->nullable(),
-                    Forms\Components\DateTimePicker::make("resolved_at")->label(
-                        "Resolved At",
+                    Forms\Components\DateTimePicker::make('resolved_at')->label(
+                        'Resolved At',
                     ),
-                    Forms\Components\Textarea::make("remarks")
-                        ->label("Remarks")
+                    Forms\Components\Textarea::make('remarks')
+                        ->label('Remarks')
                         ->rows(3)
                         ->columnSpanFull(),
                 ])
@@ -122,70 +126,70 @@ class TicketResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make("ticket_number")
-                    ->label("Ticket No.")
-                    ->fontFamily("mono")
-                    ->color("primary")
+                Tables\Columns\TextColumn::make('ticket_number')
+                    ->label('Ticket No.')
+                    ->fontFamily('mono')
+                    ->color('primary')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make("issue_title")
-                    ->label("Issue")
+                Tables\Columns\TextColumn::make('issue_title')
+                    ->label('Issue')
                     ->searchable()
                     ->limit(40)
-                    ->weight("bold"),
-                Tables\Columns\TextColumn::make("school.name")
-                    ->label("School")
+                    ->weight('bold'),
+                Tables\Columns\TextColumn::make('school.name')
+                    ->label('School')
                     ->limit(25),
-                Tables\Columns\TextColumn::make("equipment.model")->label(
-                    "Equipment",
+                Tables\Columns\TextColumn::make('equipment.model')->label(
+                    'Equipment',
                 ),
-                Tables\Columns\TextColumn::make("priority")
+                Tables\Columns\TextColumn::make('priority')
                     ->badge()
                     ->colors([
-                        "success" => "low",
-                        "warning" => "medium",
-                        "danger" => fn($state) => in_array($state, [
-                            "high",
-                            "critical",
+                        'success' => 'low',
+                        'warning' => 'medium',
+                        'danger' => fn ($state) => in_array($state, [
+                            'high',
+                            'critical',
                         ]),
                     ]),
-                Tables\Columns\TextColumn::make("status")
+                Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->colors([
-                        "warning" => "open",
-                        "primary" => "in-progress",
-                        "gray" => "pending",
-                        "success" => fn($state) => in_array($state, [
-                            "resolved",
-                            "closed",
+                        'warning' => 'open',
+                        'primary' => 'in-progress',
+                        'gray' => 'pending',
+                        'success' => fn ($state) => in_array($state, [
+                            'resolved',
+                            'closed',
                         ]),
                     ]),
-                Tables\Columns\TextColumn::make("assignedTo.full_name")->label(
-                    "Assigned To",
+                Tables\Columns\TextColumn::make('assignedTo.full_name')->label(
+                    'Assigned To',
                 ),
-                Tables\Columns\TextColumn::make("created_at")
-                    ->label("Created")
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Created')
                     ->date()
                     ->sortable(),
-                Tables\Columns\TextColumn::make("resolved_at")
-                    ->label("Resolved")
+                Tables\Columns\TextColumn::make('resolved_at')
+                    ->label('Resolved')
                     ->date(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make("status")->options([
-                    "open" => "Open",
-                    "in-progress" => "In Progress",
-                    "pending" => "Pending",
-                    "resolved" => "Resolved",
+                Tables\Filters\SelectFilter::make('status')->options([
+                    'open' => 'Open',
+                    'in-progress' => 'In Progress',
+                    'pending' => 'Pending',
+                    'resolved' => 'Resolved',
                 ]),
-                Tables\Filters\SelectFilter::make("priority")->options([
-                    "low" => "Low",
-                    "medium" => "Medium",
-                    "high" => "High",
-                    "critical" => "Critical",
+                Tables\Filters\SelectFilter::make('priority')->options([
+                    'low' => 'Low',
+                    'medium' => 'Medium',
+                    'high' => 'High',
+                    'critical' => 'Critical',
                 ]),
-                Tables\Filters\SelectFilter::make("school")
-                    ->relationship("school", "name")
+                Tables\Filters\SelectFilter::make('school')
+                    ->relationship('school', 'name')
                     ->searchable()
                     ->preload(),
             ])
@@ -193,15 +197,15 @@ class TicketResource extends Resource
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
-            ->defaultSort("created_at", "desc");
+            ->defaultSort('created_at', 'desc');
     }
 
     public static function getPages(): array
     {
         return [
-            "index" => Pages\ListTickets::route("/"),
-            "create" => Pages\CreateTicket::route("/create"),
-            "edit" => Pages\EditTicket::route("/{record}/edit"),
+            'index' => Pages\ListTickets::route('/'),
+            'create' => Pages\CreateTicket::route('/create'),
+            'edit' => Pages\EditTicket::route('/{record}/edit'),
         ];
     }
 }

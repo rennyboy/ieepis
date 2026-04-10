@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\DistrictResource\Pages;
-use App\Models\District;
 use App\Models\Division;
 use App\Models\User;
 use Filament\Forms;
@@ -17,9 +16,11 @@ use Illuminate\Support\Facades\Auth;
 class DistrictResource extends Resource
 {
     protected static ?string $navigationIcon = 'heroicon-o-map';
-    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationGroup = 'Management';
+
     protected static ?int $navigationSort = 2;
+
     protected static ?string $recordTitleAttribute = 'name';
 
     public static function form(Form $form): Form
@@ -104,9 +105,9 @@ class DistrictResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListDistricts::route('/'),
+            'index' => Pages\ListDistricts::route('/'),
             'create' => Pages\CreateDistrict::route('/create'),
-            'edit'   => Pages\EditDistrict::route('/{record}/edit'),
+            'edit' => Pages\EditDistrict::route('/{record}/edit'),
         ];
     }
 
@@ -118,7 +119,7 @@ class DistrictResource extends Resource
         /** @var User|null $user */
         $user = Auth::user();
 
-        if (!($user instanceof User)) {
+        if (! ($user instanceof User)) {
             return false;
         }
 
@@ -134,7 +135,7 @@ class DistrictResource extends Resource
         // Division Admins only see their own division's districts
         if ($user instanceof User && $user->hasRole('division-admin') && $user->division_id) {
             $divisionId = $user->division_id;
-            $query->where(fn(Builder $q) => $q->where('division_id', $divisionId));
+            $query->where(fn (Builder $q) => $q->where('division_id', $divisionId));
         }
 
         return $query;
