@@ -3,7 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
-use App\Models\School;
+use App\Models\Employee;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Components\Select;
@@ -29,11 +29,12 @@ use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 
 /**
- * UserResource for managing users in Filament admin panel
+ * UserResource — manages auth identities.
  *
- * Handles user management with role-based access control.
- * School Admins can only manage their own school's users.
- * Super Admins and SDO Admins can manage all users.
+ * Personal/organizational data lives on Employee. The form picks an existing
+ * Employee (by full_name) and the resulting User is auto-linked via
+ * `employees.user_id`. Reads of `$user->name` / `$user->school_id` delegate
+ * through the employee.
  */
 class UserResource extends Resource
 {
@@ -48,74 +49,52 @@ class UserResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            TextInput::make('name')->required()->maxLength(255),
+            Select::make('employee_id')
+                ->label('Linked Employee')
+                ->helperText('User identity = this employee. Personal info (name, school) is edited via the Employee record.')
+                ->options(function (?Model $record): array {
+                    /** @var User|null $authUser */
+                    $authUser = Auth::user();
+
+                    $query = Employee::query()
+                        ->whereDoesntHave('user', fn (Builder $q) => $record ? $q->where('users.id', '!=', $record->id) : null)
+                        ->where('status', 'active');
+
+                    if ($authUser && ! $authUser->hasRole(['super-admin', 'sdo-admin'])) {
+                        $query->where('school_id', $authUser->school_id);
+                    }
+
+                    return $query->orderBy('full_name')->pluck('full_name', 'id')->toArray();
+                })
+                ->searchable()
+                ->preload()
+                ->required()
+                ->afterStateHydrated(function (Select $component, ?Model $record): void {
+                    if ($record instanceof User) {
+                        $component->state($record->employee?->id);
+                    }
+                })
+                ->dehydrated(false),
+
             TextInput::make('email')
                 ->email()
                 ->required()
                 ->maxLength(255)
                 ->unique(ignoreRecord: true),
+
             TextInput::make('password')
                 ->password()
                 ->required()
                 ->minLength(8)
                 ->hiddenOn('edit')
                 ->dehydrateStateUsing(fn ($state) => Hash::make($state)),
-            Select::make('school_id')
-                ->label('School')
-                ->options(function (): array {
-                    /** @var User|null $user */
-                    $user = Auth::user();
-                    if (
-                        $user instanceof User &&
-                        $user->hasRole(['super-admin', 'sdo-admin'])
-                    ) {
-                        /** @var Collection<int, School> $schools */
-                        $schools = School::all();
 
-                        return $schools->pluck('name', 'id')->toArray();
-                    } elseif ($user instanceof User && $user->school) {
-                        return [$user->school->id => $user->school->name];
-                    }
-
-                    return [];
-                })
-                ->required()
-                ->visible(function () {
-                    /** @var User|null $user */
-                    $user = Auth::user();
-
-                    return $user instanceof User &&
-                        $user->hasRole(['super-admin', 'sdo-admin']);
-                })
-                ->disabled(function () {
-                    /** @var User|null $user */
-                    $user = Auth::user();
-
-                    return ! (
-                        $user instanceof User &&
-                        $user->hasRole(['super-admin', 'sdo-admin'])
-                    );
-                }),
             Forms\Components\Select::make('roles')
                 ->multiple()
                 ->relationship('roles', 'name')
                 ->preload()
-                ->visible(function () {
-                    /** @var User|null $user */
-                    $user = Auth::user();
-
-                    return $user instanceof User &&
-                        $user->hasRole(['super-admin', 'sdo-admin']);
-                })
-                ->disabled(function () {
-                    /** @var User|null $user */
-                    $user = Auth::user();
-
-                    return ! (
-                        $user instanceof User &&
-                        $user->hasRole(['super-admin', 'sdo-admin'])
-                    );
-                }),
+                ->visible(fn () => Auth::user()?->hasRole(['super-admin', 'sdo-admin']))
+                ->disabled(fn () => ! Auth::user()?->hasRole(['super-admin', 'sdo-admin'])),
         ]);
     }
 
@@ -123,158 +102,73 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')->searchable(),
+                TextColumn::make('employee.full_name')->label('Name')->searchable(),
                 TextColumn::make('email')->searchable(),
-                TextColumn::make('school.name')->label('School')->searchable(),
+                TextColumn::make('employee.school.name')->label('School')->searchable(),
                 TextColumn::make('roles.name')->label('Roles')->badge(),
+                TextColumn::make('approval_status')->badge()->colors([
+                    'warning' => 'pending',
+                    'success' => 'approved',
+                    'danger' => 'rejected',
+                ]),
             ])
             ->filters([
-                SelectFilter::make('school_id')
+                SelectFilter::make('school')
                     ->label('School')
-                    ->options(function () {
-                        /** @var Collection<int, School> $schools */
-                        $schools = School::all();
-
-                        return $schools->pluck('name', 'id')->toArray();
-                    })
-                    ->visible(function () {
-                        /** @var User|null $user */
-                        $user = Auth::user();
-
-                        return $user instanceof User &&
-                            $user->hasRole(['super-admin', 'sdo-admin']);
-                    }),
+                    ->relationship('employee.school', 'name')
+                    ->visible(fn () => Auth::user()?->hasRole(['super-admin', 'sdo-admin'])),
                 SelectFilter::make('role')
                     ->label('Role')
-                    ->options(function (): array {
-                        /** @var Collection<int, Role> $roles */
-                        $roles = Role::all();
-
-                        return $roles->pluck('name', 'name')->toArray();
-                    })
+                    ->options(fn (): array => Role::all()->pluck('name', 'name')->toArray())
                     ->query(function (Builder $query, array $data): Builder {
-                        if (isset($data['value'])) {
-                            // Use whereHas to filter users by role without triggering IDE errors
-                            return $query->whereHas('roles', function (
-                                Builder $subQuery,
-                            ) use ($data) {
-                                $subQuery->where(
-                                    fn (Builder $q) => $q->where(
-                                        'name',
-                                        $data['value'],
-                                    ),
-                                );
-                            });
+                        if (! isset($data['value'])) {
+                            return $query;
                         }
 
-                        return $query;
+                        return $query->whereHas('roles', fn (Builder $q) => $q->where('name', $data['value']));
                     }),
             ])
             ->actions([
                 EditAction::make(),
-                Action::make('transfer')
+                Action::make('reassignEmployee')
+                    ->label('Reassign Employee')
                     ->icon('heroicon-o-arrow-path')
-                    ->modalHeading('Transfer / Reassign User')
+                    ->modalHeading('Reassign User to a Different Employee')
                     ->form([
-                        TextInput::make('name')
-                            ->label('Full name')
-                            ->required()
-                            ->default(fn ($record) => $record->name ?? null),
-                        TextInput::make('email')
-                            ->label('Email (leave blank to keep)')
-                            ->email()
-                            ->nullable(),
-                        Select::make('school_id')
-                            ->label('School')
-                            ->options(
-                                fn (): array => School::pluck(
-                                    'name',
-                                    'id',
-                                )->toArray(),
-                            )
-                            ->nullable(),
-                        Forms\Components\Select::make('roles')
-                            ->label('Roles')
-                            ->multiple()
-                            ->options(
-                                fn (): array => Role::all()
-                                    ->pluck('name', 'name')
-                                    ->toArray(),
-                            )
-                            ->nullable(),
+                        Select::make('employee_id')
+                            ->label('Employee')
+                            ->options(fn (): array => Employee::query()
+                                ->whereDoesntHave('user')
+                                ->orderBy('full_name')
+                                ->pluck('full_name', 'id')
+                                ->toArray())
+                            ->required(),
                     ])
-                    ->action(function (User $record, array $data) {
-                        // Keep a copy of original for audit if needed
-                        $original = $record->replicate();
-
-                        $record->update([
-                            'name' => $data['name'],
-                            'email' => $data['email'] ?? $record->email,
-                            'school_id' => $data['school_id'] ?? $record->school_id,
-                        ]);
-
-                        if (isset($data['roles'])) {
-                            $record->syncRoles($data['roles']);
-                        }
-
-                        // Notify the affected user and relevant admins via database notifications
-                        $recipients = \Illuminate\Support\Collection::make([
-                            $record,
-                        ]);
-
-                        $admins = User::query()
-                            ->whereHas('roles', function ($q) {
-                                $q->whereIn('name', [
-                                    'super-admin',
-                                    'sdo-admin',
-                                ]);
-                            })
-                            ->get();
-
-                        $recipients = $recipients
-                            ->merge($admins)
-                            ->unique('id')
-                            ->values();
+                    ->action(function (User $record, array $data): void {
+                        Employee::query()->where('user_id', $record->id)->update(['user_id' => null]);
+                        Employee::query()->whereKey($data['employee_id'])->update(['user_id' => $record->id]);
 
                         Notification::make()
-                            ->title('Account reassigned')
-                            ->body(
-                                "Your account has been reassigned to \"{$record->school?->name}\". If this was unexpected, please contact your administrator.",
-                            )
-                            ->icon('heroicon-o-user')
-                            ->sendToDatabase($recipients);
-
-                        // Give the acting admin immediate feedback in the UI
-                        \Filament\Notifications\Notification::make()
                             ->title('User reassigned')
-                            ->success()
-                            ->send();
+                            ->body("User {$record->email} is now linked to a different employee.")
+                            ->sendToDatabase(\Illuminate\Support\Collection::make([$record]));
+
+                        Notification::make()->title('User reassigned')->success()->send();
                     })
-                    ->visible(
-                        fn ($record) => $record instanceof User &&
-                            ! $record->hasRole('super-admin'),
-                    ),
+                    ->visible(fn ($record) => $record instanceof User && ! $record->hasRole('super-admin')),
                 Action::make('assignRole')
                     ->icon('heroicon-o-user-plus')
                     ->form([
                         Select::make('role')
-                            ->options(function (): array {
-                                /** @var Collection<int, Role> $roles */
-                                $roles = Role::all();
-
-                                return $roles->pluck('name', 'name')->toArray();
-                            })
+                            ->options(fn (): array => Role::all()->pluck('name', 'name')->toArray())
                             ->required(),
                     ])
-                    ->action(function ($record, array $data) {
+                    ->action(function ($record, array $data): void {
                         if ($record instanceof User) {
                             $record->assignRole($data['role']);
                         }
                     })
-                    ->visible(
-                        fn ($record) => $record instanceof User &&
-                            ! $record->hasRole('super-admin'),
-                    ),
+                    ->visible(fn ($record) => $record instanceof User && ! $record->hasRole('super-admin')),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -304,36 +198,22 @@ class UserResource extends Resource
         /** @var User|null $user */
         $user = Auth::user();
 
-        if (! ($user instanceof User)) {
+        if (! $user instanceof User) {
             return false;
         }
 
-        if (
-            $action === 'view' ||
-            $action === 'create' ||
-            $action === 'delete' ||
-            $action === 'forceDelete' ||
-            $action === 'restore'
-        ) {
+        if (in_array($action, ['view', 'create', 'delete', 'forceDelete', 'restore'], true)) {
             return $user->hasRole(['super-admin', 'sdo-admin']);
         }
 
         if ($action === 'edit') {
-            // Super Admins and SDO Admins can edit any user
             if ($user->hasRole(['super-admin', 'sdo-admin'])) {
                 return true;
             }
 
-            // School Admins can only edit their own user profile
-            if (
-                $user->hasRole('school-admin') &&
-                $record instanceof User &&
-                $record->id === $user->id
-            ) {
-                return true;
-            }
-
-            return false;
+            return $user->hasRole('school-admin')
+                && $record instanceof User
+                && $record->id === $user->id;
         }
 
         return false;
@@ -341,29 +221,18 @@ class UserResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        /** @var \App\Models\User $user */
+        /** @var User|null $user */
         $user = Auth::user();
 
-        $query = parent::getEloquentQuery()->withoutGlobalScopes([
-            SoftDeletingScope::class,
-        ]);
+        $query = parent::getEloquentQuery()->withoutGlobalScopes([SoftDeletingScope::class]);
 
         if (! $user instanceof User) {
             return $query->whereRaw('1=0');
         }
 
-        // Scope users for SDO Admins to only see their school's users
-        $query->when(
-            fn () => $user->hasRole('sdo-admin'),
-            fn (Builder $q) => $q->where('school_id', $user->school_id),
+        return $query->when(
+            $user->hasRole(['sdo-admin', 'school-admin']) && $user->school_id,
+            fn (Builder $q) => $q->whereHas('employee', fn (Builder $eq) => $eq->where('school_id', $user->school_id)),
         );
-
-        // Scope users for School Admins to only see their own school's users
-        $query->when(
-            fn () => $user->hasRole('school-admin'),
-            fn (Builder $q) => $q->where('school_id', $user->school_id),
-        );
-
-        return $query;
     }
 }

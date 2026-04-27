@@ -16,6 +16,7 @@ class Employee extends Model
     use HasFactory, SoftDeletes, LogsActivity;
 
     protected $fillable = [
+        "user_id",
         "school_id",
         "employee_number",
         "first_name",
@@ -84,6 +85,14 @@ class Employee extends Model
     public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\User, self>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

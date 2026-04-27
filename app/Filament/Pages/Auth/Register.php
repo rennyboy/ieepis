@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Auth;
 
 use App\Models\ApprovedUser;
+use App\Models\Employee;
 use App\Models\User;
 use Filament\Pages\Auth\Register as BaseRegister;
 use Filament\Http\Responses\Auth\Contracts\RegistrationResponse;
@@ -35,17 +36,19 @@ class Register extends BaseRegister
             ]);
         }
 
-        // Create the user
         $user = User::create([
-            'name' => $data['name'],
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
-            'approval_status' => 'approved', // Already checked above
-            'division' => $approvedUser->division,
-            'division_id' => $approvedUser->division_id,
+            'approval_status' => 'approved',
         ]);
 
-        // Assign the role from the whitelist
+        // Link to existing Employee record (if one matches by email) so
+        // delegated $user->name / $user->school_id resolve immediately.
+        Employee::query()
+            ->whereNull('user_id')
+            ->where('email', $data['email'])
+            ->update(['user_id' => $user->id]);
+
         if ($approvedUser->role) {
             $user->assignRole($approvedUser->role);
         }

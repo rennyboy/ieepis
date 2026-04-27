@@ -1,0 +1,14 @@
+# Gemini Code Assist / generic AI exclusion
+# SecondBrain/ is intentionally NOT excluded so the vault stays searchable.
+.obsidian/
+.git/
+node_modules/
+vendor/
+public/build/
+storage/logs/
+storage/framework/
+bootstrap/cache/
+dist/
+build/
+.venv/
+__pycache__/
