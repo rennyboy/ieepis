@@ -126,10 +126,25 @@ class SetupSchoolProfile extends Page
             'is_active' => true,
         ]);
 
-        // 2. Assign School to User
+        // 2. Link the current user to this school via their Employee record.
+        // After identity unification, school_id lives on Employee, not User.
         /** @var \App\Models\User $user */
         $user = Auth::user();
-        $user->update(['school_id' => $school->id]);
+        $employee = Employee::firstOrCreate(
+            ['user_id' => $user->id],
+            [
+                'school_id' => $school->id,
+                'email' => $user->email,
+                'employee_number' => 'EMP-'.strtoupper(\Illuminate\Support\Str::random(8)),
+                'first_name' => 'School',
+                'last_name' => 'Administrator',
+                'employment_type' => 'non-teaching',
+                'status' => 'active',
+            ],
+        );
+        if ($employee->school_id !== $school->id) {
+            $employee->update(['school_id' => $school->id]);
+        }
 
         // 3. Create Employees
         if (!empty($data['employees'])) {

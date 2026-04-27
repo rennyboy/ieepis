@@ -1,0 +1,11 @@
+# Cursor Rules (legacy — IEEPIS)
+
+Session protocol lives in `AGENTS.md`. Read it first.
+
+Modern Cursor reads `.cursor/rules/main.mdc` automatically; this `.cursorrules` is the legacy fallback.
+
+Follow the protocol:
+1. `.ai/handoff.md` (always)
+2. `.ai/memory.md` index → load relevant section
+3. For Laravel/Filament code: `.ai/laravel-boost.md`
+4. Optional role: `.agents/<role>.md`

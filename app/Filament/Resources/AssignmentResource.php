@@ -10,7 +10,6 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
 class AssignmentResource extends Resource
@@ -33,20 +32,13 @@ class AssignmentResource extends Resource
                     Forms\Components\Select::make('school_id')
                         ->label('School')
                         ->relationship('school', 'name')
-                        ->disabled(
-                            function () {
-                                /** @var \App\Models\User $user */
-                                $user = Auth::user();
-
-                                return ! $user->hasRole('super-admin');
-                            },
-                        )
-                        ->default(function () {
+                        ->disabled(function () {
                             /** @var \App\Models\User $user */
                             $user = Auth::user();
 
-                            return $user->school_id;
+                            return ! $user->hasRole('super-admin');
                         })
+                        ->default(fn () => Auth::user()?->school_id)
                         ->searchable()
                         ->preload()
                         ->required(),
@@ -55,19 +47,15 @@ class AssignmentResource extends Resource
                         ->relationship(
                             'equipment',
                             'model',
-                            fn ($query) => $query->where(
-                                'accountability_status',
-                                'unassigned',
-                            ),
+                            fn ($query) => $query->where('accountability_status', 'unassigned'),
                         )
                         ->getOptionLabelFromRecordUsing(
-                            fn (
-                                Equipment $record,
-                            ): string => "{$record->brand} {$record->model} ({$record->property_no})",
+                            fn (Equipment $record): string => "{$record->brand} {$record->model} ({$record->property_no})",
                         )
-                        ->searchable()
+                        ->searchable(['brand', 'model', 'property_no', 'serial_number'])
                         ->preload()
-                        ->required(),
+                        ->required()
+                        ->disabledOn('edit'),
                     Forms\Components\Select::make('employee_id')
                         ->label('Accountable Officer')
                         ->relationship(
@@ -105,30 +93,20 @@ class AssignmentResource extends Resource
                             'RRSP' => 'RRSP',
                             'RRPE' => 'RRPE',
                         ]),
-                    Forms\Components\TextInput::make(
-                        'supporting_doc_no',
-                    )->label('Document No.'),
+                    Forms\Components\TextInput::make('supporting_doc_no')->label('Document No.'),
                     Forms\Components\DatePicker::make('assigned_at')
                         ->label('Date Assigned')
                         ->required()
                         ->default(now()),
-                    Forms\Components\DatePicker::make(
-                        'custodian_received_at',
-                    )->label('Date Received by Custodian'),
-                    Forms\Components\TextInput::make('assigned_by')
+                    Forms\Components\DatePicker::make('custodian_received_at')
+                        ->label('Date Received by Custodian'),
+                    Forms\Components\Placeholder::make('assigned_by_display')
                         ->label('Assigned By')
-                        ->required(),
-                    Forms\Components\Textarea::make('notes')
-                        ->rows(3)
-                        ->columnSpanFull(),
+                        ->content(fn () => Auth::user()?->name ?? '—')
+                        ->dehydrated(false),
+                    Forms\Components\Textarea::make('notes')->rows(3)->columnSpanFull(),
                 ])
                 ->columns(['default' => 2]),
-
-            Forms\Components\Section::make('Return Details')->schema([
-                Forms\Components\DatePicker::make('returned_at')->label(
-                    'Date Returned (leave blank if still active)',
-                ),
-            ]),
         ]);
     }
 
@@ -145,18 +123,14 @@ class AssignmentResource extends Resource
                     ->fontFamily('mono')
                     ->color('primary')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('equipment.brand')->label(
-                    'Brand',
-                ),
+                Tables\Columns\TextColumn::make('equipment.brand')->label('Brand'),
                 Tables\Columns\TextColumn::make('equipment.model')
                     ->label('Model')
                     ->weight('bold'),
                 Tables\Columns\TextColumn::make('employee.full_name')
                     ->label('Accountable Officer')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('custodian.full_name')->label(
-                    'Custodian',
-                ),
+                Tables\Columns\TextColumn::make('custodian.full_name')->label('Custodian'),
                 Tables\Columns\TextColumn::make('transaction_type')
                     ->label('Transaction')
                     ->badge()
@@ -165,22 +139,19 @@ class AssignmentResource extends Resource
                     ->label('Doc Type')
                     ->badge()
                     ->color('gray'),
-                Tables\Columns\TextColumn::make('supporting_doc_no')->label(
-                    'Doc No.',
-                ),
+                Tables\Columns\TextColumn::make('supporting_doc_no')->label('Doc No.'),
                 Tables\Columns\TextColumn::make('assigned_at')
                     ->label('Assigned')
                     ->date()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('returned_at')
-                    ->label('Returned')
-                    ->date(),
-                Tables\Columns\IconColumn::make('is_active')
+                Tables\Columns\TextColumn::make('returned_at')->label('Returned')->date(),
+                Tables\Columns\TextColumn::make('assignedBy.name')
+                    ->label('Assigned By')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('active')
                     ->label('Active')
                     ->boolean()
-                    ->getStateUsing(
-                        fn (EquipmentAssignment $r) => is_null($r->returned_at),
-                    ),
+                    ->getStateUsing(fn (EquipmentAssignment $r) => $r->isActive()),
             ])
             ->filters([
                 Tables\Filters\Filter::make('active_only')
@@ -196,36 +167,13 @@ class AssignmentResource extends Resource
                 Tables\Filters\SelectFilter::make('school_id')
                     ->label('School')
                     ->relationship('school', 'name')
-                    ->visible(function () {
-                        /** @var \App\Models\User $user */
-                        $user = Auth::user();
-
-                        return $user->hasRole('super-admin');
-                    }),
+                    ->visible(fn () => Auth::user()?->hasRole('super-admin')),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
             ->defaultSort('assigned_at', 'desc');
-    }
-
-    public static function getEloquentQuery(): Builder
-    {
-        /** @var \App\Models\User|null $user */
-        $user = Auth::user();
-
-        $query = parent::getEloquentQuery();
-
-        $query->when(
-            fn () => $user && ! $user->hasRole('super-admin'),
-            fn (Builder $q) => $q->where(
-                fn (Builder $q2) => $q2->where('school_id', $user->school_id)
-                    ->orWhereNull('school_id'),
-            ),
-        );
-
-        return $query;
     }
 
     public static function getPages(): array

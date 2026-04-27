@@ -1,309 +1,149 @@
-<laravel-boost-guidelines>
-=== foundation rules ===
+# AGENTS.md — Universal AI Session Protocol (IEEPIS)
 
-# Laravel Boost Guidelines
+This file is the **single source of truth** for every AI coding tool used in this repo. Read it first. Every other rule file (`CLAUDE.md`, `GEMINI.md`, `AGENT.md`, `.cursorrules`, `.cursor/rules/*.mdc`, `.windsurfrules`, `.kilocode/rules.md`) is a pointer here.
 
-The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to ensure the best experience when building Laravel applications.
+Target tools: Claude Code, Cursor, Antigravity / Gemini Code Assist, Kilo AI, OpenCode, Zed, Windsurf, GPT/Codex, Aider, and any future agent.
 
-## Foundational Context
+---
 
-This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
+## 1. Session Start Protocol (do this before any task)
 
-- php - 8.4
-- filament/filament (FILAMENT) - v3
-- laravel/framework (LARAVEL) - v11
-- laravel/prompts (PROMPTS) - v0
-- laravel/socialite (SOCIALITE) - v5
-- livewire/livewire (LIVEWIRE) - v3
-- laravel/boost (BOOST) - v2
-- laravel/mcp (MCP) - v0
-- laravel/pint (PINT) - v1
-- laravel/sail (SAIL) - v1
-- laravel/telescope (TELESCOPE) - v5
-- phpunit/phpunit (PHPUNIT) - v11
-- tailwindcss (TAILWINDCSS) - v3
+1. Read `SecondBrain/INDEX.md` + the four always-loaded indexes (skip silently if symlink missing — it's optional cross-project memory):
+   - `SecondBrain/Errors/INDEX.md` (failure library — scan for symptoms relevant to today's task)
+   - `SecondBrain/Knowledge/INDEX.md` (distilled rules)
+   - `SecondBrain/Decisions/INDEX.md` (active major decisions)
+   - `SecondBrain/Projects/INDEX.md` (confirm IEEPIS is registered)
+2. Read `.ai/handoff.md` — last session state, blockers, next actions. **Always.**
+3. Read `.ai/memory.md` section index (top 20 lines) — load only the sections relevant to the task.
+4. If the task touches Laravel/Filament/Eloquent code: also read the relevant section of `.ai/laravel-boost.md` (project-specific framework rules).
+5. If the user specifies a role: load `.agents/<role>.md`.
+6. Confirm context loaded in one line: `"Loaded: brain[errors,knowledge,decisions,projects] + handoff + memory[sections] + <role>."` Then wait for the task.
 
-## Skills Activation
+**Do not** read `.ai/architecture.md`, `.ai/decisions.md`, `.ai/coding_rules.md`, `.ai/laravel-boost.md`, or any individual SecondBrain entry file unless the task matches. Token budget is finite.
 
-This project has domain-specific skills available. You MUST activate the relevant skill whenever you work in that domain—don't wait until you're stuck.
+---
 
-- `laravel-best-practices` — Apply this skill whenever writing, reviewing, or refactoring Laravel PHP code. This includes creating or modifying controllers, models, migrations, form requests, policies, jobs, scheduled commands, service classes, and Eloquent queries. Triggers for N+1 and query performance issues, caching strategies, authorization and security patterns, validation, error handling, queue and job configuration, route definitions, and architectural decisions. Also use for Laravel code reviews and refactoring existing Laravel code to follow best practices. Covers any task involving Laravel backend PHP code patterns.
-- `socialite-development` — Manages OAuth social authentication with Laravel Socialite. Activate when adding social login providers; configuring OAuth redirect/callback flows; retrieving authenticated user details; customizing scopes or parameters; setting up community providers; testing with Socialite fakes; or when the user mentions social login, OAuth, Socialite, or third-party authentication.
-- `tailwindcss-development` — Always invoke when the user's message includes 'tailwind' in any form. Also invoke for: building responsive grid layouts (multi-column card grids, product grids), flex/grid page structures (dashboards with sidebars, fixed topbars, mobile-toggle navs), styling UI components (cards, tables, navbars, pricing sections, forms, inputs, badges), adding dark mode variants, fixing spacing or typography, and Tailwind v3/v4 work. The core use case: writing or fixing Tailwind utility classes in HTML templates (Blade, JSX, Vue). Skip for backend PHP logic, database queries, API routes, JavaScript with no HTML/CSS component, CSS file audits, build tool configuration, and vanilla CSS.
+## 2. Session End Protocol (do this after meaningful work)
 
-## Conventions
+1. Update `.ai/handoff.md` — what was done, blockers, next actions. Keep under 25 lines.
+2. Update `.ai/tasks.md` — check off completed tasks, add new ones discovered.
+3. If a major decision was made → append an entry to `.ai/decisions.md` with Decision / Reason / Trade-off. If it generalizes beyond this project → also capture in `SecondBrain/Decisions/`.
+4. **If an error or surprise was hit:** capture using `SecondBrain/Prompts/error-capture.md`. Either increment an existing `Errors/INDEX.md` row's `Hits` or create a new entry from `Templates/error.md`.
+5. **If a non-obvious observation was made:** drop it into `SecondBrain/Learnings/` (staging area for promotion to `Knowledge/`).
+6. Never summarize work only in chat. It will be lost. Write it to `handoff.md` or the appropriate SecondBrain location.
 
-- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, and naming.
-- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
-- Check for existing components to reuse before writing a new one.
+### Rotation (when size caps are hit — do not silently violate them)
+- `handoff.md` exceeds 25 lines → move "What Was Completed" to `SecondBrain/Daily Notes/YYYY-MM-DD.md` before writing new entries.
+- `.ai/memory.md` section exceeds 50 lines → split that section into `.ai/memory-<topic>.md` and update the index.
+- `.ai/tasks.md` exceeds 50 lines → move completed items to `SecondBrain/Daily Notes/YYYY-MM-DD.md`.
+- `.ai/decisions.md` exceeds 50 lines → split by year into `SecondBrain/Decisions/YYYY.md`.
 
-## Verification Scripts
+---
 
-- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
+## 3. File Map
 
-## Application Structure & Architecture
+### Repo memory (per project)
+| File | Purpose | Load when |
+|---|---|---|
+| `.ai/handoff.md` | Last session state → next actions | **Always, first** |
+| `.ai/memory.md` | Project identity, stack, constraints | Every session, scoped to section |
+| `.ai/tasks.md` | Sprint tasks + backlog | Task planning, end of session |
+| `.ai/architecture.md` | Modules, services, data flow (slim — defers to root `ARCHITECTURE.md`) | Only when working on structure |
+| `.ai/decisions.md` | Dated decision log | Only when revisiting a choice |
+| `.ai/coding_rules.md` | Memory file + AI interaction rules | Only when uncertain of convention |
+| `.ai/laravel-boost.md` | Laravel/Filament/Eloquent project conventions (Boost-generated) | Only when writing framework code |
+| `.ai/context.json` | Machine-readable module/relationship map | When mapping models or relationships |
 
-- Stick to existing directory structure; don't create new base folders without approval.
-- Do not change the application's dependencies without approval.
+### Agent roles (per project)
+| Role | File | Use for |
+|---|---|---|
+| Architect | `.agents/architect.md` | System design, structure, data flow |
+| Debugger | `.agents/debugger.md` | Root cause, minimal fixes |
+| Refactor | `.agents/refactor.md` | Clean code, readability |
+| PM | `.agents/pm.md` | Task prioritization, milestones |
+| Reviewer | `.agents/reviewer.md` | Code quality, risk |
+| Assistant | `.agents/assistant.md` | Daily general-purpose helper |
+| Scheduler | `.agents/scheduler.md` | Time-blocking, daily plan |
+| Reminder | `.agents/reminder.md` | Reminders, accountability |
 
-## Frontend Bundling
+`.agents/skills/` (Boost-managed Filament/Laravel/Tailwind skills) auto-activates per its own triggers — do not edit by hand.
 
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `vendor/bin/sail npm run build`, `vendor/bin/sail npm run dev`, or `vendor/bin/sail composer run dev`. Ask them.
+Activate a role by telling the AI: *"Use the `<role>` role."*
 
-## Documentation Files
+### Strategic vault (cross-project — `SecondBrain/`)
 
-- You must only create documentation files if explicitly requested by the user.
+Lives at `~/SecondBrain` (canonical), symlinked into this project at `./SecondBrain`. Optional but recommended.
 
-## Replies
+Always-loaded surfaces (~500 lines combined cap):
+- `SecondBrain/INDEX.md` — entry point
+- `SecondBrain/Errors/INDEX.md` — failure library (cap 200 lines)
+- `SecondBrain/Knowledge/INDEX.md` — distilled rules (cap 100 lines)
+- `SecondBrain/Decisions/INDEX.md` — major decisions (cap 100 lines)
+- `SecondBrain/Projects/INDEX.md` — multi-project registry (cap 50 lines)
 
-- Be concise in your explanations - focus on what's important rather than explaining obvious details.
+On-demand: `Bugs/`, `Learnings/`, `Daily Notes/`, `Templates/`, `Prompts/`, `Assistant/`.
 
-=== boost rules ===
+---
 
-# Laravel Boost
+## 4. Token-Saving Rules (enforced, not optional)
 
-## Tools
+- **Scoped reads only.** Say *"Read `.ai/memory.md` Stack section"* — not *"Read `.ai/memory.md`"*.
+- **One task per session.** Start a new chat for unrelated topics.
+- **Never re-explain project context in chat.** It lives in `.ai/memory.md`. Reference it, don't paste it.
+- **Cheap tools for cheap tasks.** Claude Code / GPT-5 / Opus for design and debugging. Cursor tab / Kilo / local models for syntax fixes and boilerplate.
+- **File size caps:** `.ai/*` files stay under 50 lines each except `laravel-boost.md` (allowed to be larger because it's loaded only on demand). `handoff.md` under 25.
+- **Indexers:** `.cursorignore`, `.kilocodeignore`, `.aiexclude`, `.codeiumignore` exclude build output (`node_modules`, `vendor`, `public/build`, `storage`). `SecondBrain/` stays **indexed**.
 
-- Laravel Boost is an MCP server with tools designed specifically for this application. Prefer Boost tools over manual alternatives like shell commands or file reads.
-- Use `database-query` to run read-only queries against the database instead of writing raw SQL in tinker.
-- Use `database-schema` to inspect table structure before writing migrations or models.
-- Use `get-absolute-url` to resolve the correct scheme, domain, and port for project URLs. Always use this before sharing a URL with the user.
-- Use `browser-logs` to read browser logs, errors, and exceptions. Only recent logs are useful, ignore old entries.
+---
 
-## Searching Documentation (IMPORTANT)
+## 5. Bootstrap for tools without auto-load
 
-- Always use `search-docs` before making code changes. Do not skip this step. It returns version-specific docs based on installed packages automatically.
-- Pass a `packages` array to scope results when you know which packages are relevant.
-- Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
-- Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
+Tools like ChatGPT or generic agents won't auto-load anything. Paste this as your first message:
 
-### Search Syntax
+> Read `.ai/handoff.md` and the index at the top of `.ai/memory.md`. If the task requires it, also read the matching section of `.ai/memory.md` or `.ai/laravel-boost.md`. Follow the session protocol in `AGENTS.md`. Confirm loaded, then await task.
 
-1. Use words for auto-stemmed AND logic: `rate limit` matches both "rate" AND "limit".
-2. Use `"quoted phrases"` for exact position matching: `"infinite scroll"` requires adjacent words in order.
-3. Combine words and phrases for mixed queries: `middleware "rate limit"`.
-4. Use multiple queries for OR logic: `queries=["authentication", "middleware"]`.
+---
 
-## Artisan
+## 6. Cross-Tool Cheat Sheet
 
-- Run Artisan commands directly via the command line (e.g., `vendor/bin/sail artisan route:list`). Use `vendor/bin/sail artisan list` to discover available commands and `vendor/bin/sail artisan [command] --help` to check parameters.
-- Inspect routes with `vendor/bin/sail artisan route:list`. Filter with: `--method=GET`, `--name=users`, `--path=api`, `--except-vendor`, `--only-vendor`.
-- Read configuration values using dot notation: `vendor/bin/sail artisan config:show app.name`, `vendor/bin/sail artisan config:show database.default`. Or read config files directly from the `config/` directory.
-- To check environment variables, read the `.env` file directly.
+| Tool | Entrypoint | Behavior |
+|---|---|---|
+| Claude Code | `CLAUDE.md` + `.claude/rules/*.md` → AGENTS.md | Auto-loads `CLAUDE.md` and `.claude/rules/`. Mirrors of sections of this file. |
+| Cursor | `.cursor/rules/main.mdc` (native) + `.cursorrules` (legacy) → AGENTS.md | |
+| Windsurf | `.windsurfrules` → AGENTS.md | |
+| Kilo AI | `.kilocode/rules.md` → AGENTS.md | |
+| Antigravity / Gemini | `GEMINI.md` → AGENTS.md | |
+| OpenCode | `opencode.json` + `AGENTS.md` (native) | |
+| Zed | `.zed/` + `AGENTS.md` (native) | |
+| Aider | `.aider.conf.yml` references AGENTS.md | |
+| Codex / GPT | Paste the bootstrap above | Manual. |
 
-## Tinker
+---
 
-- Execute PHP in app context for debugging and testing code. Do not create models without user approval, prefer tests with factories instead. Prefer existing Artisan commands over custom tinker code.
-- Always use single quotes to prevent shell expansion: `vendor/bin/sail artisan tinker --execute 'Your::code();'`
-  - Double quotes for PHP strings inside: `vendor/bin/sail artisan tinker --execute 'User::where("active", true)->count();'`
+## 7. Project-Specific Framework Rules
 
-=== php rules ===
+Laravel 11 / FilamentPHP v3 / Livewire v3 / PHP 8.4 / MySQL / Sail conventions live in **`.ai/laravel-boost.md`** (Boost-generated). Load that file on demand when writing framework code — not on every session.
 
-# PHP
+Project domain rules (DepEd-specific accountability model, equipment_assignments invariants, school-scoped queries, etc.) live in **`.ai/memory.md`** under the relevant section.
 
-- Always use curly braces for control structures, even for single-line bodies.
-- Use PHP 8 constructor property promotion: `public function __construct(public GitHub $github) { }`. Do not leave empty zero-parameter `__construct()` methods unless the constructor is private.
-- Use explicit return type declarations and type hints for all method parameters: `function isAccessible(User $user, ?string $path = null): bool`
-- Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
-- Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
-- Use array shape type definitions in PHPDoc blocks.
+Root-level docs (`README.md`, root `ARCHITECTURE.md`, root `DECISIONS.md`, `TASKS.md`, `MANIFEST.md`, `*_DEPLOYMENT*.md`) are human-facing. AI agents should prefer `.ai/*` for current state.
 
-=== sail rules ===
+---
 
-# Laravel Sail
+## 8. Safety: Boost Regeneration
 
-- This project runs inside Laravel Sail's Docker containers. You MUST execute all commands through Sail.
-- Start services using `vendor/bin/sail up -d` and stop them with `vendor/bin/sail stop`.
-- Open the application in the browser by running `vendor/bin/sail open`.
-- Always prefix PHP, Artisan, Composer, and Node commands with `vendor/bin/sail`. Examples:
-    - Run Artisan Commands: `vendor/bin/sail artisan migrate`
-    - Install Composer packages: `vendor/bin/sail composer install`
-    - Execute Node commands: `vendor/bin/sail npm run dev`
-    - Execute PHP scripts: `vendor/bin/sail php [script]`
-- View all available Sail commands by running `vendor/bin/sail` without arguments.
+If `php artisan boost:install` is re-run, it will overwrite `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` with Boost defaults. To restore the workspace protocol after regeneration:
 
-=== laravel/core rules ===
+```bash
+bash scripts/restore-pointers.sh
+```
 
-# Do Things the Laravel Way
+That script puts the pointer files back and re-relocates fresh Boost output to `.ai/laravel-boost.md`.
 
-- Use `vendor/bin/sail artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `vendor/bin/sail artisan list` and check their parameters with `vendor/bin/sail artisan [command] --help`.
-- If you're creating a generic PHP class, use `vendor/bin/sail artisan make:class`.
-- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
+---
 
-### Model Creation
+## 9. Principle
 
-- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `vendor/bin/sail artisan make:model --help` to check the available options.
+> Stateless high-value reasoning engine + persistent markdown memory + scoped role prompts = portable AI teammate.
 
-## APIs & Eloquent Resources
-
-- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
-
-## URL Generation
-
-- When generating links to other pages, prefer named routes and the `route()` function.
-
-## Testing
-
-- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
-- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
-- When creating tests, make use of `vendor/bin/sail artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
-
-## Vite Error
-
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `vendor/bin/sail npm run build` or ask the user to run `vendor/bin/sail npm run dev` or `vendor/bin/sail composer run dev`.
-
-=== laravel/v11 rules ===
-
-# Laravel 11
-
-- CRITICAL: ALWAYS use `search-docs` tool for version-specific Laravel documentation and updated code examples.
-- Laravel 11 brought a new streamlined file structure which this project now uses.
-
-## Laravel 11 Structure
-
-- In Laravel 11, middleware are no longer registered in `app/Http/Kernel.php`.
-- Middleware are configured declaratively in `bootstrap/app.php` using `Application::configure()->withMiddleware()`.
-- `bootstrap/app.php` is the file to register middleware, exceptions, and routing files.
-- `bootstrap/providers.php` contains application specific service providers.
-- No app\Console\Kernel.php - use `bootstrap/app.php` or `routes/console.php` for console configuration.
-- Commands auto-register - files in `app/Console/Commands/` are automatically available and do not require manual registration.
-
-## Database
-
-- When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
-- Laravel 11 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
-
-### Models
-
-- Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models.
-
-## New Artisan Commands
-
-- List Artisan commands using Boost's MCP tool, if available. New commands available in Laravel 11:
-    - `vendor/bin/sail artisan make:enum`
-    - `vendor/bin/sail artisan make:class`
-    - `vendor/bin/sail artisan make:interface`
-
-=== pint/core rules ===
-
-# Laravel Pint Code Formatter
-
-- If you have modified any PHP files, you must run `vendor/bin/sail bin pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
-- Do not run `vendor/bin/sail bin pint --test --format agent`, simply run `vendor/bin/sail bin pint --format agent` to fix any formatting issues.
-
-=== phpunit/core rules ===
-
-# PHPUnit
-
-- This application uses PHPUnit for testing. All tests must be written as PHPUnit classes. Use `vendor/bin/sail artisan make:test --phpunit {name}` to create a new test.
-- If you see a test using "Pest", convert it to PHPUnit.
-- Every time a test has been updated, run that singular test.
-- When the tests relating to your feature are passing, ask the user if they would like to also run the entire test suite to make sure everything is still passing.
-- Tests should cover all happy paths, failure paths, and edge cases.
-- You must not remove any tests or test files from the tests directory without approval. These are not temporary or helper files; these are core to the application.
-
-## Running Tests
-
-- Run the minimal number of tests, using an appropriate filter, before finalizing.
-- To run all tests: `vendor/bin/sail artisan test --compact`.
-- To run all tests in a file: `vendor/bin/sail artisan test --compact tests/Feature/ExampleTest.php`.
-- To filter on a particular test name: `vendor/bin/sail artisan test --compact --filter=testName` (recommended after making a change to a related file).
-
-=== filament/filament rules ===
-
-## Filament
-
-- Filament is used by this application, check how and where to follow existing application conventions.
-- Filament is a Server-Driven UI (SDUI) framework for Laravel. It allows developers to define user interfaces in PHP using structured configuration objects. It is built on top of Livewire, Alpine.js, and Tailwind CSS.
-- You can use the `search-docs` tool to get information from the official Filament documentation when needed. This is very useful for Artisan command arguments, specific code examples, testing functionality, relationship management, and ensuring you're following idiomatic practices.
-- Utilize static `make()` methods for consistent component initialization.
-
-### Artisan
-
-- You must use the Filament specific Artisan commands to create new files or components for Filament. You can find these with the `list-artisan-commands` tool, or with `php artisan` and the `--help` option.
-- Inspect the required options, always pass `--no-interaction`, and valid arguments for other options when applicable.
-
-### Filament's Core Features
-
-- Actions: Handle doing something within the application, often with a button or link. Actions encapsulate the UI, the interactive modal window, and the logic that should be executed when the modal window is submitted. They can be used anywhere in the UI and are commonly used to perform one-time actions like deleting a record, sending an email, or updating data in the database based on modal form input.
-- Forms: Dynamic forms rendered within other features, such as resources, action modals, table filters, and more.
-- Infolists: Read-only lists of data.
-- Notifications: Flash notifications displayed to users within the application.
-- Panels: The top-level container in Filament that can include all other features like pages, resources, forms, tables, notifications, actions, infolists, and widgets.
-- Resources: Static classes that are used to build CRUD interfaces for Eloquent models. Typically live in `app/Filament/Resources`.
-- Schemas: Represent components that define the structure and behavior of the UI, such as forms, tables, or lists.
-- Tables: Interactive tables with filtering, sorting, pagination, and more.
-- Widgets: Small component included within dashboards, often used for displaying data in charts, tables, or as a stat.
-
-### Relationships
-
-- Determine if you can use the `relationship()` method on form components when you need `options` for a select, checkbox, repeater, or when building a `Fieldset`:
-
-<code-snippet name="Relationship example for Form Select" lang="php">
-Forms\Components\Select::make('user_id')
-    ->label('Author')
-    ->relationship('author')
-    ->required(),
-</code-snippet>
-
-## Testing
-
-- It's important to test Filament functionality for user satisfaction.
-- Ensure that you are authenticated to access the application within the test.
-- Filament uses Livewire, so start assertions with `livewire()` or `Livewire::test()`.
-
-### Example Tests
-
-<code-snippet name="Filament Table Test" lang="php">
-    livewire(ListUsers::class)
-        ->assertCanSeeTableRecords($users)
-        ->searchTable($users->first()->name)
-        ->assertCanSeeTableRecords($users->take(1))
-        ->assertCanNotSeeTableRecords($users->skip(1))
-        ->searchTable($users->last()->email)
-        ->assertCanSeeTableRecords($users->take(-1))
-        ->assertCanNotSeeTableRecords($users->take($users->count() - 1));
-</code-snippet>
-
-<code-snippet name="Filament Create Resource Test" lang="php">
-    livewire(CreateUser::class)
-        ->fillForm([
-            'name' => 'Howdy',
-            'email' => 'howdy@example.com',
-        ])
-        ->call('create')
-        ->assertNotified()
-        ->assertRedirect();
-
-    assertDatabaseHas(User::class, [
-        'name' => 'Howdy',
-        'email' => 'howdy@example.com',
-    ]);
-</code-snippet>
-
-<code-snippet name="Testing Multiple Panels (setup())" lang="php">
-    use Filament\Facades\Filament;
-
-    Filament::setCurrentPanel('app');
-</code-snippet>
-
-<code-snippet name="Calling an Action in a Test" lang="php">
-    livewire(EditInvoice::class, [
-        'invoice' => $invoice,
-    ])->callAction('send');
-
-    expect($invoice->refresh())->isSent()->toBeTrue();
-</code-snippet>
-
-## Version 3 Changes To Focus On
-
-- Resources are located in `app/Filament/Resources/` directory.
-- Resource pages (List, Create, Edit) are auto-generated within the resource's directory - e.g., `app/Filament/Resources/PostResource/Pages/`.
-- Forms use the `Forms\Components` namespace for form fields.
-- Tables use the `Tables\Columns` namespace for table columns.
-- A new `Filament\Forms\Components\RichEditor` component is available.
-- Form and table schemas now use fluent method chaining.
-- Added `php artisan filament:optimize` command for production optimization.
-- Requires implementing `FilamentUser` contract for production access control.
-
-</laravel-boost-guidelines>
+Claude / GPT / Cursor are **consultants**, not memory. Memory lives here on disk.

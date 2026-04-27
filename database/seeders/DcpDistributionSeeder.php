@@ -82,7 +82,7 @@ class DcpDistributionSeeder extends Seeder
                             'item_type' => $type,
                             'is_dcp' => true,
                             'dcp_package' => 'Batch 2024',
-                            'accountability_status' => ['Distributed', 'Pending', 'Received'][rand(0, 2)],
+                            'accountability_status' => 'unassigned',
                             'is_functional' => true,
                             'condition' => 'Good',
                             'brand' => 'DCP Brand',

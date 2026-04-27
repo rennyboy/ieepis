@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApprovedUser;
+use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Exception;
@@ -67,14 +68,18 @@ class GoogleController extends Controller
 
             // 4. Create new user from Google Data (Status is Approved)
             $newUser = User::create([
-                'name' => $googleUser->name,
                 'email' => $googleUser->email,
                 'google_id' => $googleUser->id,
                 'password' => Hash::make(Str::random(24)),
                 'approval_status' => 'approved',
-                'division' => $approvedUser->division,
-                'division_id' => $approvedUser->division_id,
             ]);
+
+            // Link to existing Employee record (if one matches by email) so
+            // delegated $user->name / $user->school_id resolve immediately.
+            Employee::query()
+                ->whereNull('user_id')
+                ->where('email', $googleUser->email)
+                ->update(['user_id' => $newUser->id]);
 
             if ($approvedUser->role) {
                 $newUser->assignRole($approvedUser->role);

@@ -13,8 +13,10 @@ Route::get('/up', function () {
     return response()->json(['status' => 'ok', 'system' => 'IEEPIS', 'version' => '1.0.0']);
 });
 
-Route::get('auth/google', [GoogleController::class, 'redirectToGoogle'])->name('google.login');
-Route::get('auth/google/callback', [GoogleController::class, 'handleGoogleCallback']);
+Route::middleware('throttle:oauth')->group(function (): void {
+    Route::get('auth/google', [GoogleController::class, 'redirectToGoogle'])->name('google.login');
+    Route::get('auth/google/callback', [GoogleController::class, 'handleGoogleCallback']);
+});
 
 Route::get('employees/pdf/bulk', [EmployeePdfController::class, 'generateBulkPdf'])
     ->name('employees.pdf.bulk')

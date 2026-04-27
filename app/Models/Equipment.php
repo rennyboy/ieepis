@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -126,21 +125,6 @@ class Equipment extends Model
         return $this->hasOne(EquipmentAssignment::class)
             ->where(fn ($q) => $q->whereNull("returned_at"))
             ->latest();
-    }
-
-    /**
-     * @return \Illuminate\Database\Eloquent\Relations\HasOneThrough<\App\Models\Employee>
-     */
-    public function accountableOfficer(): HasOneThrough
-    {
-        return $this->hasOneThrough(
-            Employee::class,
-            EquipmentAssignment::class,
-            "equipment_id",
-            "id",
-            "id",
-            "employee_id",
-        );
     }
 
     /**
