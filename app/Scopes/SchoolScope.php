@@ -33,25 +33,28 @@ class SchoolScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
-        /** @var \App\Models\User|null $user */
+        // Skip during user resolution. `User::$with = ['employee']` triggers an
+        // Employee query while SessionGuard is still resolving `$this->user`;
+        // calling `Auth::user()` here would recurse and hit max_execution_time.
+        // `hasUser()` returns `false` mid-resolution and does NOT trigger it,
+        // so the eager-loaded employee skips the scope (correct: we're loading
+        // the auth user's own employee, no school filter needed).
+        if (! Auth::hasUser()) {
+            return;
+        }
+
         $user = Auth::user();
 
-        // Skip filtering if:
-        // 1. No user is authenticated
-        // 2. User is a super-admin
-        if (!$user || $user->hasRole('super-admin')) {
+        if (! $user instanceof \App\Models\User || $user->hasRole('super-admin')) {
             return;
         }
 
-        // Get school_id from user column (direct access, safe)
         $schoolId = $user->school_id;
 
-        // Skip if no school_id
-        if (!$schoolId) {
+        if (! $schoolId) {
             return;
         }
 
-        // Filter by user's school_id
         $builder->where('school_id', $schoolId);
     }
 }

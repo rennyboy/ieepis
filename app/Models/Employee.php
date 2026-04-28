@@ -57,7 +57,12 @@ class Employee extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logAll()->logOnlyDirty();
+        // PII columns are logged in `activity_log.properties` JSON if not excluded.
+        // A breach of activity_log would expose change history of personal info.
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->logExcept(['personal_email', 'mobile_1', 'mobile_2']);
     }
 
     protected static function booted(): void

@@ -86,7 +86,7 @@ class SetupSchoolProfile extends Page
                         ->schema([
                             Repeater::make('equipment')
                                 ->schema([
-                                    TextInput::make('property_number')->label('Property No.'),
+                                    TextInput::make('property_no')->label('Property No.'),
                                     Select::make('type')
                                         ->options([
                                             'Laptop' => 'Laptop',
