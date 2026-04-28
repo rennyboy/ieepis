@@ -40,6 +40,10 @@ php artisan migrate --force 2>/dev/null || {
     echo "Migration warning, continuing..."
 }
 
+# Ensure public storage symlink exists for uploaded documents/images
+echo "Linking public storage..."
+php artisan storage:link --force 2>/dev/null || true
+
 # Optimize application for production
 echo "Optimizing application..."
 php artisan config:cache 2>/dev/null || true

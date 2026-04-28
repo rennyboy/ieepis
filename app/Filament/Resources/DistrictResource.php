@@ -17,7 +17,7 @@ class DistrictResource extends Resource
 {
     protected static ?string $navigationIcon = 'heroicon-o-map';
 
-    protected static ?string $navigationGroup = 'Management';
+    protected static ?string $navigationGroup = 'Organization';
 
     protected static ?int $navigationSort = 2;
 

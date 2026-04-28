@@ -72,18 +72,13 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop(true)
             ->topNavigation(false)
             ->navigationGroups([
-                NavigationGroup::make('Overview'),
-                NavigationGroup::make('Management')->icon(
-                    'heroicon-o-building-office',
-                ),
-                NavigationGroup::make('ICT Inventory')->icon(
-                    'heroicon-o-computer-desktop',
-                ),
-                NavigationGroup::make('Monitoring')->icon(
-                    'heroicon-o-chart-bar',
-                ),
-                NavigationGroup::make('Reports & Tools')
-                    ->icon('heroicon-o-document-chart-bar')
+                NavigationGroup::make('Overview')->icon('heroicon-o-chart-pie'),
+                NavigationGroup::make('ICT Inventory')->icon('heroicon-o-computer-desktop'),
+                NavigationGroup::make('People')->icon('heroicon-o-users'),
+                NavigationGroup::make('Organization')->icon('heroicon-o-building-office-2'),
+                NavigationGroup::make('Documents & Tickets')->icon('heroicon-o-inbox-stack'),
+                NavigationGroup::make('Administration')
+                    ->icon('heroicon-o-shield-check')
                     ->collapsed(),
             ])
             ->discoverResources(

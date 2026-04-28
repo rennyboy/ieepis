@@ -20,7 +20,7 @@ class ApprovedUserResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-check-badge';
 
-    protected static ?string $navigationGroup = 'Settings';
+    protected static ?string $navigationGroup = 'Administration';
 
     protected static ?string $navigationLabel = 'User Approvals';
 
