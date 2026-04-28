@@ -113,8 +113,8 @@ class TicketResource extends Resource
                     Forms\Components\DateTimePicker::make('resolved_at')->label(
                         'Resolved At',
                     ),
-                    Forms\Components\Textarea::make('remarks')
-                        ->label('Remarks')
+                    Forms\Components\Textarea::make('resolution_notes')
+                        ->label('Resolution Notes')
                         ->rows(3)
                         ->columnSpanFull(),
                 ])

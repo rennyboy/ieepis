@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod -R 775 storage/framework)"
+    ]
+  }
+}

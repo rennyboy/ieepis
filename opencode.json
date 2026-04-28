@@ -4,18 +4,10 @@
     "laravel-boost": {
       "type": "local",
       "enabled": true,
-      "command": [
-        "vendor/bin/sail",
-        "artisan",
-        "boost:mcp"
-      ]
+      "command": ["php", "artisan", "boost:mcp"]
     }
   },
-  "instructions": "Read AGENT.md first. This is IEEPIS — a DepEd Philippines ICT inventory system built with PHP 8.4 / Laravel 11 / FilamentPHP v3. All commands use vendor/bin/sail prefix. Never add employee_id FK to equipment table. Use PHPUnit class-based tests only. Run pint after PHP changes.",
-  "contextFiles": [
-    "AGENT.md",
-    "ARCHITECTURE.md",
-    "DECISIONS.md",
-    "project.json"
+  "instructions": [
+    "Follow AGENTS.md. Run commands locally — no Sail/Docker (Decision 014). Read .ai/handoff.md first, then the .ai/memory.md section index and load only the relevant section. Domain rules: Equipment has no employee_id FK; AssignmentService is the sole write path for equipment assignments; Employee is canonical, User is auth-only with employees.user_id link (Decision 011). DB-agnostic: PostgreSQL + MySQL via Schema builder only (Decision 010)."
   ]
 }

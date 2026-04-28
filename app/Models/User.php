@@ -54,7 +54,21 @@ class User extends Authenticatable implements FilamentUser
         'approval_status' => 'string',
     ];
 
-    protected $appends = ['name', 'school_id', 'division_id'];
+    /**
+     * Only `name` is appended — it has no underlying column. `school_id` IS a
+     * column (auto-serialized) and `division_id` is a 3-hop chain that should
+     * be requested explicitly (or via `with('employee.school.district')`),
+     * never auto-fired on every serialization.
+     */
+    protected $appends = ['name'];
+
+    /**
+     * Auto-eager-load `employee` so reads of `$user->name` and the school_id
+     * accessor fallback don't trigger a query per access. Costs one extra
+     * JOIN-equivalent per User query; pays itself back many times in Filament
+     * list pages, navbar widget, and per-request auth.
+     */
+    protected $with = ['employee'];
 
     /**
      * @return HasOne<\App\Models\Employee>
@@ -71,7 +85,7 @@ class User extends Authenticatable implements FilamentUser
 
     public function getSchoolIdAttribute(): ?int
     {
-        return $this->school_id ?? $this->employee?->school_id;
+        return $this->attributes['school_id'] ?? $this->employee?->school_id;
     }
 
     public function getDivisionIdAttribute(): ?int

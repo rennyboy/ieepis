@@ -15,7 +15,7 @@ return new class extends Migration {
                 ->foreignId("school_id")
                 ->nullable()
                 ->constrained()
-                ->cascadeOnDelete();
+                ->nullOnDelete();
         });
     }
 

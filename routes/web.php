@@ -18,10 +18,10 @@ Route::middleware('throttle:oauth')->group(function (): void {
     Route::get('auth/google/callback', [GoogleController::class, 'handleGoogleCallback']);
 });
 
-Route::get('employees/pdf/bulk', [EmployeePdfController::class, 'generateBulkPdf'])
-    ->name('employees.pdf.bulk')
-    ->middleware(['auth']);
+Route::middleware(['auth', 'role:super-admin|sdo-admin|school-admin'])->group(function (): void {
+    Route::get('employees/pdf/bulk', [EmployeePdfController::class, 'generateBulkPdf'])
+        ->name('employees.pdf.bulk');
 
-Route::get('equipment/pdf/bulk', [EquipmentPdfController::class, 'generateBulkPdf'])
-    ->name('equipment.pdf.bulk')
-    ->middleware(['auth']);
+    Route::get('equipment/pdf/bulk', [EquipmentPdfController::class, 'generateBulkPdf'])
+        ->name('equipment.pdf.bulk');
+});

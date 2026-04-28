@@ -5,11 +5,13 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\AssignmentResource\Pages;
 use App\Models\Equipment;
 use App\Models\EquipmentAssignment;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
 class AssignmentResource extends Resource
@@ -183,5 +185,40 @@ class AssignmentResource extends Resource
             'create' => Pages\CreateAssignment::route('/create'),
             'edit' => Pages\EditAssignment::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Role-based authorization. SchoolScope already isolates rows per school;
+     * this gate decides which actions each role can perform within their scope.
+     *
+     * - super-admin / sdo-admin: full access
+     * - school-admin: view + create + update (return flow + corrections)
+     * - technician: view only
+     * - viewer: view only
+     * - delete/forceDelete/restore: super-admin / sdo-admin only — assignment
+     *   history is audit-bearing and should not be removed casually
+     */
+    public static function can(string $action, ?Model $record = null): bool
+    {
+        /** @var User|null $user */
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        if ($user->hasRole(['super-admin', 'sdo-admin'])) {
+            return true;
+        }
+
+        if (in_array($action, ['view', 'viewAny'], true)) {
+            return $user->hasRole(['school-admin', 'technician', 'viewer']);
+        }
+
+        if (in_array($action, ['create', 'update'], true)) {
+            return $user->hasRole('school-admin');
+        }
+
+        return false;
     }
 }

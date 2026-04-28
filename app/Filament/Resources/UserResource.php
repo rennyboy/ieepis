@@ -119,7 +119,7 @@ class UserResource extends Resource
                     ->visible(fn () => Auth::user()?->hasRole(['super-admin', 'sdo-admin'])),
                 SelectFilter::make('role')
                     ->label('Role')
-                    ->options(fn (): array => Role::all()->pluck('name', 'name')->toArray())
+                    ->options(fn (): array => \Illuminate\Support\Facades\Cache::remember('iEEPIS.roles_select_options', 3600, fn () => Role::query()->orderBy('name')->pluck('name', 'name')->toArray()))
                     ->query(function (Builder $query, array $data): Builder {
                         if (! isset($data['value'])) {
                             return $query;
@@ -160,7 +160,7 @@ class UserResource extends Resource
                     ->icon('heroicon-o-user-plus')
                     ->form([
                         Select::make('role')
-                            ->options(fn (): array => Role::all()->pluck('name', 'name')->toArray())
+                            ->options(fn (): array => \Illuminate\Support\Facades\Cache::remember('iEEPIS.roles_select_options', 3600, fn () => Role::query()->orderBy('name')->pluck('name', 'name')->toArray()))
                             ->required(),
                     ])
                     ->action(function ($record, array $data): void {

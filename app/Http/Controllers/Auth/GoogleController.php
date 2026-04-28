@@ -23,7 +23,16 @@ class GoogleController extends Controller
     {
         try {
             $googleUser = Socialite::driver('google')->user();
-            
+
+            // Reject unverified Google accounts. Without this, an attacker could
+            // register a Google account with an unverified email matching real
+            // staff and slide into the approval queue.
+            $verified = (bool) ($googleUser->user['email_verified'] ?? $googleUser->getRaw()['email_verified'] ?? false);
+            if (! $verified) {
+                return redirect()->route('filament.admin.auth.login')
+                    ->withErrors(['email' => 'Your Google account email is not verified. Please verify it with Google before signing in.']);
+            }
+
             // 1. Check if user already exists by Google ID
             $existingUser = User::where('google_id', $googleUser->id)->first();
             

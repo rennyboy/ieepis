@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('equipment', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('school_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('school_id')->constrained()->restrictOnDelete();
             $table->string('property_no')->unique();
             $table->string('old_property_no')->nullable();
             $table->string('serial_number')->nullable();
