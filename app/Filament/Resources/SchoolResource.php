@@ -22,7 +22,7 @@ class SchoolResource extends Resource
 {
     protected static ?string $model = School::class;
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
-    protected static ?string $navigationGroup = 'Management';
+    protected static ?string $navigationGroup = 'Organization';
     protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'name';
 

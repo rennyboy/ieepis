@@ -110,12 +110,10 @@ Tools like ChatGPT or generic agents won't auto-load anything. Paste this as you
 |---|---|---|
 | Claude Code | `CLAUDE.md` + `.claude/rules/*.md` → AGENTS.md | Auto-loads `CLAUDE.md` and `.claude/rules/`. Mirrors of sections of this file. |
 | Cursor | `.cursor/rules/main.mdc` (native) + `.cursorrules` (legacy) → AGENTS.md | |
-| Windsurf | `.windsurfrules` → AGENTS.md | |
 | Kilo AI | `.kilocode/rules.md` → AGENTS.md | |
 | Antigravity / Gemini | `GEMINI.md` → AGENTS.md | |
 | OpenCode | `opencode.json` + `AGENTS.md` (native) | |
 | Zed | `.zed/` + `AGENTS.md` (native) | |
-| Aider | `.aider.conf.yml` references AGENTS.md | |
 | Codex / GPT | Paste the bootstrap above | Manual. |
 
 ---

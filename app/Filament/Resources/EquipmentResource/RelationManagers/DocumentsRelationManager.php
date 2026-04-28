@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\EquipmentResource\RelationManagers;
 
+use App\Enums\DocumentType;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -17,7 +18,7 @@ class DocumentsRelationManager extends RelationManager
     {
         return $form->schema([
             Forms\Components\Select::make('document_type')
-                ->options(['PAR' => 'PAR', 'ICS' => 'ICS', 'IAR' => 'IAR', 'DR' => 'DR', 'OR' => 'OR', 'SI' => 'SI', 'WMR' => 'WMR', 'RRSP' => 'RRSP', 'Other' => 'Other'])
+                ->options(DocumentType::options())
                 ->required(),
             Forms\Components\TextInput::make('document_no'),
             Forms\Components\DatePicker::make('document_date'),
@@ -33,6 +34,7 @@ class DocumentsRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('title')
+            ->description('Attach paperwork (PAR, ICS, IAR, etc.) here. The "Document" button on the equipment list opens the most recent attachment.')
             ->columns([
                 Tables\Columns\TextColumn::make('document_type')->badge()->color('info'),
                 Tables\Columns\TextColumn::make('document_no'),

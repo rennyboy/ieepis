@@ -2,18 +2,24 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\DocumentType;
 use App\Filament\Resources\EquipmentResource\Pages;
 use App\Filament\Resources\EquipmentResource\RelationManagers;
+use App\Models\Document;
 use App\Models\Equipment;
+use Filament\Actions as PageActions;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class EquipmentResource extends Resource
 {
@@ -469,6 +475,8 @@ class EquipmentResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                self::sharedDocumentViewAction(),
+                self::sharedDocumentAttachAction(),
                 Tables\Actions\Action::make('qrcode')
                     ->label('QR Code')
                     ->icon('heroicon-o-qr-code')
@@ -644,5 +652,112 @@ class EquipmentResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['property_no', 'serial_number', 'brand', 'model'];
+    }
+
+    /**
+     * Form schema used by both the table-row and page-header "Attach Document" actions.
+     *
+     * @return array<\Filament\Forms\Components\Component>
+     */
+    protected static function attachDocumentForm(): array
+    {
+        return [
+            Forms\Components\Select::make('document_type')
+                ->options(DocumentType::options())
+                ->required(),
+            Forms\Components\TextInput::make('document_no')->label('Document No.'),
+            Forms\Components\DatePicker::make('document_date')->default(now()),
+            Forms\Components\TextInput::make('title')->required()->columnSpanFull(),
+            Forms\Components\Textarea::make('description')->columnSpanFull(),
+            Forms\Components\FileUpload::make('file_path')
+                ->label('File')
+                ->disk('public')
+                ->directory(fn (Equipment $record) => "schools/{$record->school_id}/documents")
+                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+                ->maxSize(10240)
+                ->required()
+                ->columnSpanFull(),
+        ];
+    }
+
+    protected static function attachDocumentHandler(Equipment $record, array $data): void
+    {
+        Document::create([
+            'school_id' => $record->school_id,
+            'equipment_id' => $record->id,
+            'document_type' => $data['document_type'],
+            'document_no' => $data['document_no'] ?? null,
+            'title' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'file_path' => $data['file_path'],
+            'document_date' => $data['document_date'] ?? null,
+            'uploaded_by_id' => Auth::id(),
+        ]);
+
+        Notification::make()
+            ->success()
+            ->title('Document attached')
+            ->body('The file is now linked to this equipment.')
+            ->send();
+    }
+
+    /**
+     * Table row action — opens the most recent document in a new tab when one exists.
+     */
+    public static function sharedDocumentViewAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('sharedDocumentView')
+            ->label('Document')
+            ->icon('heroicon-o-document-arrow-down')
+            ->color('success')
+            ->visible(fn (Equipment $record) => $record->hasSharedDocument())
+            ->url(fn (Equipment $record) => Storage::disk('public')->url($record->sharedDocument()->file_path))
+            ->openUrlInNewTab();
+    }
+
+    /**
+     * Table row action — upload a document when none is attached yet.
+     */
+    public static function sharedDocumentAttachAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('sharedDocumentAttach')
+            ->label('Attach Document')
+            ->icon('heroicon-o-document-plus')
+            ->color('warning')
+            ->visible(fn (Equipment $record) => ! $record->hasSharedDocument())
+            ->modalHeading('Attach a document to this equipment')
+            ->modalSubmitActionLabel('Upload')
+            ->form(self::attachDocumentForm())
+            ->action(fn (Equipment $record, array $data) => self::attachDocumentHandler($record, $data));
+    }
+
+    /**
+     * Page header variant — same behaviour as the row "view" action, scoped to a single record.
+     */
+    public static function sharedDocumentViewPageAction(): PageActions\Action
+    {
+        return PageActions\Action::make('sharedDocumentView')
+            ->label('Document')
+            ->icon('heroicon-o-document-arrow-down')
+            ->color('success')
+            ->visible(fn (Equipment $record) => $record->hasSharedDocument())
+            ->url(fn (Equipment $record) => Storage::disk('public')->url($record->sharedDocument()->file_path))
+            ->openUrlInNewTab();
+    }
+
+    /**
+     * Page header variant — upload modal scoped to the current record.
+     */
+    public static function sharedDocumentAttachPageAction(): PageActions\Action
+    {
+        return PageActions\Action::make('sharedDocumentAttach')
+            ->label('Attach Document')
+            ->icon('heroicon-o-document-plus')
+            ->color('warning')
+            ->visible(fn (Equipment $record) => ! $record->hasSharedDocument())
+            ->modalHeading('Attach a document to this equipment')
+            ->modalSubmitActionLabel('Upload')
+            ->form(self::attachDocumentForm())
+            ->action(fn (Equipment $record, array $data) => self::attachDocumentHandler($record, $data));
     }
 }

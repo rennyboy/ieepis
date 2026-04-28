@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\DocumentType;
 use App\Filament\Resources\DocumentResource\Pages;
 use App\Models\Document;
 use Filament\Forms;
@@ -33,22 +34,9 @@ class DocumentResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
 
-    protected static ?string $navigationGroup = 'Support';
+    protected static ?string $navigationGroup = 'Documents & Tickets';
 
-    protected static ?int $navigationSort = 2;
-
-    public static array $docTypes = [
-        'PAR' => 'PAR – Property Acknowledgment Receipt',
-        'ICS' => 'ICS – Inventory Custodian Slip',
-        'IAR' => 'IAR – Inspection and Acceptance Report',
-        'DR' => 'DR – Delivery Receipt',
-        'OR' => 'OR – Official Receipt',
-        'SI' => 'SI – Sales Invoice',
-        'WMR' => 'WMR – Waste Material Report',
-        'RRSP' => 'RRSP – Report on the Remedies of Seized Properties',
-        'RRPE' => 'RRPE – Report on Physical Count of Property & Equipment',
-        'Other' => 'Other',
-    ];
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -74,7 +62,7 @@ class DocumentResource extends Resource
                         ->preload()
                         ->nullable(),
                     Forms\Components\Select::make('document_type')
-                        ->options(self::$docTypes)
+                        ->options(DocumentType::options())
                         ->required(),
                     Forms\Components\TextInput::make('document_no')->label(
                         'Document No.',
@@ -151,7 +139,7 @@ class DocumentResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('document_type')->options(
-                    self::$docTypes,
+                    DocumentType::options(),
                 ),
                 Tables\Filters\SelectFilter::make('school')
                     ->relationship('school', 'name')

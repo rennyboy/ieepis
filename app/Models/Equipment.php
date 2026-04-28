@@ -136,6 +136,23 @@ class Equipment extends Model
     }
 
     /**
+     * Most-recent document attached to this equipment, ordered by document_date then created_at.
+     * Returns null when no documents exist.
+     */
+    public function sharedDocument(): ?Document
+    {
+        return $this->documents()
+            ->orderByDesc("document_date")
+            ->orderByDesc("created_at")
+            ->first();
+    }
+
+    public function hasSharedDocument(): bool
+    {
+        return $this->documents()->exists();
+    }
+
+    /**
      * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Ticket>
      */
     public function tickets(): HasMany

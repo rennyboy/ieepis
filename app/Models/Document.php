@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DocumentType;
 use App\Scopes\SchoolScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -59,6 +60,7 @@ class Document extends Model
 
     protected $casts = [
         "document_date" => "date",
+        "document_type" => DocumentType::class,
     ];
 
     protected static function booted(): void
