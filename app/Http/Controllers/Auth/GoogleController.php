@@ -48,7 +48,7 @@ class GoogleController extends Controller
                 // Self-registration via Google - add to whitelist as pending
                 ApprovedUser::create([
                     'email' => $googleUser->email,
-                    'name' => $googleUser->name,
+                    'name' => $googleUser->name ?: $googleUser->email,
                     'status' => 'pending',
                 ]);
 
@@ -76,10 +76,18 @@ class GoogleController extends Controller
 
             // Link to existing Employee record (if one matches by email) so
             // delegated $user->name / $user->school_id resolve immediately.
-            Employee::query()
+            $employee = Employee::query()
                 ->whereNull('user_id')
                 ->where('email', $googleUser->email)
-                ->update(['user_id' => $newUser->id]);
+                ->first();
+
+            if ($employee) {
+                $employee->update([
+                    'user_id' => $newUser->id,
+                    'full_name' => $googleUser->name ?? $employee->full_name,
+                    'first_name' => $googleUser->name ?? $employee->first_name,
+                ]);
+            }
 
             if ($approvedUser->role) {
                 $newUser->assignRole($approvedUser->role);
