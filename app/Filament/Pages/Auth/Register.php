@@ -44,10 +44,18 @@ class Register extends BaseRegister
 
         // Link to existing Employee record (if one matches by email) so
         // delegated $user->name / $user->school_id resolve immediately.
-        Employee::query()
+        $employee = Employee::query()
             ->whereNull('user_id')
             ->where('email', $data['email'])
-            ->update(['user_id' => $user->id]);
+            ->first();
+
+        if ($employee) {
+            $employee->update([
+                'user_id' => $user->id,
+                'full_name' => $data['name'] ?? $employee->full_name,
+                'first_name' => $data['name'] ?? $employee->first_name,
+            ]);
+        }
 
         if ($approvedUser->role) {
             $user->assignRole($approvedUser->role);
