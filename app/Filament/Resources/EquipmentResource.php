@@ -497,11 +497,11 @@ class EquipmentResource extends Resource
                     ->url(route('equipment.excel.export')),
                 Tables\Actions\Action::make('downloadTemplate')
                     ->label('Download Template')
-                    ->icon('heroicon-o-download')
+                    ->icon('heroicon-o-arrow-down-tray')
                     ->url(route('equipment.excel.template')),
                 Tables\Actions\Action::make('importEquipment')
                     ->label('Import Excel')
-                    ->icon('heroicon-o-upload')
+                    ->icon('heroicon-o-arrow-up-tray')
                     ->color('primary')
                     ->modalHeading('Import Equipment from Excel')
                     ->modalDescription('Upload an Excel file (.xlsx, .xls, or .csv) to import equipment.')
