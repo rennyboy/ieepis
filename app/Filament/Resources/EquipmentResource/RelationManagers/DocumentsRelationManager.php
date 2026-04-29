@@ -34,7 +34,7 @@ class DocumentsRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('title')
-            ->description('Attach paperwork (PAR, ICS, IAR, etc.) here. The "Document" button on the equipment list opens the most recent attachment.')
+            ->description('Upload paperwork (PAR, ICS, IAR, etc.) here. The "Linked Document" field in the Issuance tab also connects documents.')
             ->columns([
                 Tables\Columns\TextColumn::make('document_type')->badge()->color('info'),
                 Tables\Columns\TextColumn::make('document_no'),
