@@ -19,6 +19,7 @@ class Equipment extends Model
 
     protected $fillable = [
         "school_id",
+        "document_id",
         "property_no",
         "old_property_no",
         "serial_number",
@@ -107,6 +108,14 @@ class Equipment extends Model
     public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\Document, self>
+     */
+    public function document(): BelongsTo
+    {
+        return $this->belongsTo(Document::class);
     }
 
     /**

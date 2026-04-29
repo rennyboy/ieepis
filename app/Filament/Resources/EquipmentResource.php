@@ -91,7 +91,9 @@ class EquipmentResource extends Resource
                                 ->searchable()
                                 ->preload()
                                 ->required()
-                                ->columnSpanFull(),
+                                ->columnSpanFull()
+                                ->default(fn () => auth()->user()->school_id)
+                                ->disabled(fn () => ! in_array('super-admin', auth()->user()->getRoleNames()->toArray())),
 
                             Forms\Components\TextInput::make('property_no')
                                 ->label('Property No.')
@@ -321,6 +323,14 @@ class EquipmentResource extends Resource
                     Forms\Components\Tabs\Tab::make('Issuance')
                         ->icon('heroicon-o-user-circle')
                         ->schema([
+                            Forms\Components\Select::make('document_id')
+                                ->label('Linked Document (DR/PAR/ICS)')
+                                ->options(fn () => \App\Models\Document::whereIn('document_type', ['DR', 'PAR', 'ICS'])
+                                    ->orderBy('title')
+                                    ->pluck('title', 'id'))
+                                ->searchable()
+                                ->preload()
+                                ->nullable(),
                             Forms\Components\Select::make(
                                 'transaction_type',
                             )->options([
@@ -413,6 +423,10 @@ class EquipmentResource extends Resource
                             'For Disposal',
                         ]),
                     ]),
+                Tables\Columns\TextColumn::make('document.title')
+                    ->label('Linked Doc')
+                    ->limit(25)
+                    ->color('primary'),
                 Tables\Columns\TextColumn::make('warranty_status')
                     ->label('Warranty')
                     ->getStateUsing(fn (Equipment $r) => $r->warranty_status)

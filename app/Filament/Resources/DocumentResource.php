@@ -20,7 +20,8 @@ class DocumentResource extends Resource
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
 
-        $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery()
+            ->with(['equipment', 'employee', 'uploadedBy', 'school']);
 
         $query->when(
             fn () => $user && $user->school_id && ! $user->hasRole('super-admin'),
@@ -48,16 +49,15 @@ class DocumentResource extends Resource
                         ->relationship('school', 'name')
                         ->searchable()
                         ->preload()
-                        ->required(),
+                        ->required()
+                        ->default(fn () => auth()->user()->school_id)
+                        ->disabled(fn () => ! in_array('super-admin', auth()->user()->getRoleNames()->toArray())),
                     Forms\Components\Select::make('equipment_id')
                         ->label('Related Equipment')
-                        ->relationship('equipment', 'model')
-                        ->searchable()
-                        ->preload()
-                        ->nullable(),
-                    Forms\Components\Select::make('employee_id')
-                        ->label('Related Employee')
-                        ->relationship('employee', 'full_name')
+                        ->options(fn () => \App\Models\Equipment::orderBy('property_no')
+                            ->get()
+                            ->map(fn ($e) => "{$e->property_no} - {$e->model}")
+                            ->all())
                         ->searchable()
                         ->preload()
                         ->nullable(),
@@ -119,19 +119,19 @@ class DocumentResource extends Resource
                 Tables\Columns\TextColumn::make('school.name')
                     ->label('School')
                     ->limit(25),
-                Tables\Columns\TextColumn::make('equipment.model')->label(
-                    'Equipment',
-                ),
-                Tables\Columns\TextColumn::make('employee.full_name')->label(
-                    'Employee',
-                ),
+                Tables\Columns\TextColumn::make('equipment.model')
+                    ->label('Equipment')
+                    ->getStateUsing(fn ($record) => $record->equipment 
+                        ? "{$record->equipment->property_no} - {$record->equipment->model}" 
+                        : null),
+                Tables\Columns\TextColumn::make('employee.full_name')
+                    ->label('Employee'),
                 Tables\Columns\TextColumn::make('document_date')
                     ->label('Date')
                     ->date()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('uploadedBy.name')->label(
-                    'Uploaded By',
-                ),
+                Tables\Columns\TextColumn::make('uploadedBy.name')
+                    ->label('Uploaded By'),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Uploaded')
                     ->since()
