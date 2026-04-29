@@ -4,7 +4,6 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\ApprovedUserResource\Pages;
 use App\Models\ApprovedUser;
-use App\Models\School;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -43,11 +42,6 @@ class ApprovedUserResource extends Resource
                             'technician' => 'Technician',
                         ])
                         ->required(),
-                    Forms\Components\Select::make('school_id')
-                        ->label('School')
-                        ->options(School::pluck('name', 'id'))
-                        ->required()
-                        ->searchable(),
                     Forms\Components\Select::make('status')
                         ->options([
                             'pending' => 'Pending',
@@ -71,9 +65,6 @@ class ApprovedUserResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('role')
                     ->badge(),
-                Tables\Columns\TextColumn::make('school.name')
-                    ->label('School')
-                    ->searchable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -111,10 +102,7 @@ class ApprovedUserResource extends Resource
                         // Sync with Users table if user already exists
                         $user = User::where('email', $record->email)->first();
                         if ($user) {
-                            $user->update([
-                                'approval_status' => 'approved',
-                                'school_id' => $record->school_id,
-                            ]);
+                            $user->update(['approval_status' => 'approved']);
                         }
                     }),
                 Action::make('reject')
