@@ -62,6 +62,8 @@ class Ticket extends Model
     /**
      * Generate a unique ticket number
      * Format: TKT-YYYY-NNNNN where NNNNN increments
+     *
+     * Uses PostgreSQL advisory locks for concurrent-safe generation.
      */
 
     public static function generateTicketNumber($schoolId): string
@@ -73,59 +75,29 @@ class Ticket extends Model
             );
         }
 
-        // Use a MySQL-level named lock to serialize generation per school+year.
         $year = now()->year;
-        $lockName = "ticket_number_gen_school_{$schoolId}_{$year}";
-        $lockAcquired = false;
+        $lockKey = (int) ("{$schoolId}{$year}" % 2147483647);
 
-        try {
-            // Try to acquire the lock with a 10-second timeout.
-            $res = DB::select("SELECT GET_LOCK(?, 10) as got", [$lockName]);
-            $lockAcquired = isset($res[0]->got) && intval($res[0]->got) === 1;
+        DB::statement("SELECT pg_advisory_xact_lock(?)", [$lockKey]);
 
-            if (!$lockAcquired) {
-                // Could not get lock in time.
-                Log::warning(
-                    "Could not acquire MySQL GET_LOCK({$lockName}) for ticket generation.",
-                );
-                throw new \RuntimeException(
-                    "Could not acquire lock to generate ticket number. Try again.",
-                );
-            }
+        return DB::transaction(function () use ($schoolId, $year) {
+            $lastTicket = Ticket::whereYear("created_at", $year)
+                ->where("school_id", $schoolId)
+                ->latest("id")
+                ->first();
 
-            // Inside the lock, run a short transaction to read the last ticket and create the next number.
-            return DB::transaction(function () use ($schoolId, $year) {
-                $lastTicket = Ticket::whereYear("created_at", $year)
-                    ->where("school_id", $schoolId)
-                    ->latest("id")
-                    ->first();
+            $next = $lastTicket
+                ? ((int) substr($lastTicket->ticket_number, -5)) + 1
+                : 1;
 
-                $next = $lastTicket
-                    ? ((int) substr($lastTicket->ticket_number, -5)) + 1
-                    : 1;
+            $ticketNumber = sprintf("TKT-%s-%05d", $year, $next);
 
-                $ticketNumber = sprintf("TKT-%s-%05d", $year, $next);
+            Log::info(
+                "Generated ticket number with pg_advisory_xact_lock for school_id {$schoolId}: {$ticketNumber}",
+            );
 
-                Log::info(
-                    "Generated ticket number with GET_LOCK for school_id {$schoolId}: {$ticketNumber}",
-                );
-
-                return $ticketNumber;
-            });
-        } finally {
-            // Always attempt to release the lock if we acquired it.
-            if ($lockAcquired) {
-                try {
-                    DB::select("SELECT RELEASE_LOCK(?)", [$lockName]);
-                } catch (\Throwable $e) {
-                    // Log but don't prevent the main flow from continuing.
-                    Log::warning(
-                        "Failed to release GET_LOCK({$lockName}): " .
-                            $e->getMessage(),
-                    );
-                }
-            }
-        }
+            return $ticketNumber;
+        });
     }
 
     /**
