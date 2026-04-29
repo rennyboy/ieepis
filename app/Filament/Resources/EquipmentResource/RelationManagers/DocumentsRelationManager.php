@@ -34,23 +34,36 @@ class DocumentsRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('title')
-            ->description('Upload paperwork (PAR, ICS, IAR, etc.) here. The "Linked Document" field in the Issuance tab also connects documents.')
+            ->description('Upload paperwork (PAR, ICS, IAR, etc.) here. Use "Link to Existing" toggle to link documents.')
             ->columns([
-                Tables\Columns\TextColumn::make('document_type')->badge()->color('info'),
-                Tables\Columns\TextColumn::make('document_no'),
-                Tables\Columns\TextColumn::make('title')->weight('bold')->limit(40),
-                Tables\Columns\TextColumn::make('document_date')->date()->sortable(),
-                Tables\Columns\TextColumn::make('created_at')->label('Uploaded')->since(),
+                Tables\Columns\TextColumn::make('document_type')
+                    ->label('Type')
+                    ->badge()
+                    ->color('info'),
+                Tables\Columns\TextColumn::make('title')
+                    ->weight('bold')
+                    ->limit(40),
+                Tables\Columns\TextColumn::make('document_no')
+                    ->label('Doc No.')
+                    ->fontFamily('mono'),
+                Tables\Columns\TextColumn::make('document_date')
+                    ->date()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Added')
+                    ->since(),
             ])
             ->headerActions([Tables\Actions\CreateAction::make()])
             ->actions([
                 Tables\Actions\Action::make('view_file')
-                    ->label('View File')
+                    ->label('View')
                     ->icon('heroicon-o-eye')
+                    ->visible(fn ($record) => !empty($record->file_path))
                     ->url(fn ($record) => asset('storage/' . $record->file_path))
                     ->openUrlInNewTab(),
                 Tables\Actions\Action::make('download')
                     ->icon('heroicon-o-arrow-down-tray')
+                    ->visible(fn ($record) => !empty($record->file_path))
                     ->url(fn ($record) => asset('storage/' . $record->file_path))
                     ->openUrlInNewTab(),
                 Tables\Actions\DeleteAction::make(),

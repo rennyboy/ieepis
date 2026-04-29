@@ -52,15 +52,6 @@ class DocumentResource extends Resource
                         ->required()
                         ->default(fn () => auth()->user()->school_id)
                         ->disabled(fn () => ! in_array('super-admin', auth()->user()->getRoleNames()->toArray())),
-                    Forms\Components\Select::make('equipment_id')
-                        ->label('Related Equipment')
-                        ->options(fn () => \App\Models\Equipment::orderBy('property_no')
-                            ->get()
-                            ->map(fn ($e) => "{$e->property_no} - {$e->model}")
-                            ->all())
-                        ->searchable()
-                        ->preload()
-                        ->nullable(),
                     Forms\Components\Select::make('document_type')
                         ->options(DocumentType::options())
                         ->required(),
@@ -119,13 +110,6 @@ class DocumentResource extends Resource
                 Tables\Columns\TextColumn::make('school.name')
                     ->label('School')
                     ->limit(25),
-                Tables\Columns\TextColumn::make('equipment.model')
-                    ->label('Equipment')
-                    ->getStateUsing(fn ($record) => $record->equipment 
-                        ? "{$record->equipment->property_no} - {$record->equipment->model}" 
-                        : null),
-                Tables\Columns\TextColumn::make('employee.full_name')
-                    ->label('Employee'),
                 Tables\Columns\TextColumn::make('document_date')
                     ->label('Date')
                     ->date()
