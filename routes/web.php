@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\GoogleController;
+use App\Http\Controllers\EmployeeExcelController;
 use App\Http\Controllers\EmployeePdfController;
 use App\Http\Controllers\EquipmentExcelController;
 use App\Http\Controllers\EquipmentPdfController;
@@ -26,13 +27,21 @@ Route::middleware(['auth', 'role:super-admin|sdo-admin|school-admin'])->group(fu
     Route::get('equipment/pdf/bulk', [EquipmentPdfController::class, 'generateBulkPdf'])
         ->name('equipment.pdf.bulk');
 
-    // Excel Import/Export routes
     Route::get('equipment/excel/export', [EquipmentExcelController::class, 'export'])
         ->name('equipment.excel.export');
-    
+
     Route::get('equipment/excel/template', [EquipmentExcelController::class, 'template'])
         ->name('equipment.excel.template');
-    
+
     Route::post('equipment/excel/import', [EquipmentExcelController::class, 'import'])
         ->name('equipment.excel.import');
+
+    Route::get('employees/excel/export', [EmployeeExcelController::class, 'export'])
+        ->name('employees.excel.export');
+
+    Route::get('employees/excel/template', [EmployeeExcelController::class, 'template'])
+        ->name('employees.excel.template');
+
+    Route::post('employees/excel/import', [EmployeeExcelController::class, 'import'])
+        ->name('employees.excel.import');
 });

@@ -238,6 +238,48 @@ class EmployeeResource extends Resource
                 'route' => 'employees.pdf.bulk',
                 'label' => 'Export Personnel (PDF)',
             ])->render()))
+            ->headerActions([
+                Tables\Actions\Action::make('exportExcel')
+                    ->label('Export Excel')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
+                    ->url(route('employees.excel.export')),
+                Tables\Actions\Action::make('downloadTemplate')
+                    ->label('Download Template')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->url(route('employees.excel.template')),
+                Tables\Actions\Action::make('importEmployees')
+                    ->label('Import Excel')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('primary')
+                    ->modalHeading('Import Employees from Excel')
+                    ->modalDescription('Upload an Excel file (.xlsx, .xls, or .csv) to import employees.')
+                    ->form([
+                        Forms\Components\FileUpload::make('file')
+                            ->label('Select File')
+                            ->directory('imports')
+                            ->acceptedFileTypes(['.xlsx', '.xls', '.csv'])
+                            ->maxSize(10240)
+                            ->required(),
+                    ])
+                    ->action(function (array $data) {
+                        try {
+                            \Maatwebsite\Excel\Facades\Excel::import(new \App\Imports\EmployeeImport, $data['file']);
+
+                            \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('Import Successful')
+                                ->body('Employee data has been imported.')
+                                ->send();
+                        } catch (\Exception $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->danger()
+                                ->title('Import Failed')
+                                ->body('Error: ' . $e->getMessage())
+                                ->send();
+                        }
+                    }),
+            ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
