@@ -49,7 +49,7 @@ class SchoolScope implements Scope
             return;
         }
 
-        $schoolId = $user->school_id;
+        $schoolId = $user->getAttribute('school_id');
 
         if (! $schoolId) {
             return;

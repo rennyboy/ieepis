@@ -145,12 +145,13 @@ class Equipment extends Model
     }
 
     /**
-     * Most-recent document attached to this equipment, ordered by document_date then created_at.
-     * Returns null when no documents exist.
+     * Most-recent document with a file attached to this equipment, ordered by document_date then created_at.
+     * Returns null when no documents with files exist.
      */
     public function sharedDocument(): ?Document
     {
         return $this->documents()
+            ->whereNotNull('file_path')
             ->orderByDesc("document_date")
             ->orderByDesc("created_at")
             ->first();
@@ -158,7 +159,7 @@ class Equipment extends Model
 
     public function hasSharedDocument(): bool
     {
-        return $this->documents()->exists();
+        return $this->documents()->whereNotNull('file_path')->exists();
     }
 
     /**

@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Enums\DocumentType;
 use App\Filament\Resources\EquipmentResource\Pages;
 use App\Filament\Resources\EquipmentResource\RelationManagers;
+use App\Exports\EquipmentExport;
+use App\Imports\EquipmentImport;
 use App\Models\Document;
 use App\Models\Equipment;
 use Filament\Actions as PageActions;
@@ -20,6 +22,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
 
 class EquipmentResource extends Resource
 {
@@ -486,6 +489,48 @@ class EquipmentResource extends Resource
                 'route' => 'equipment.pdf.bulk',
                 'label' => 'Export Inventory (PDF)',
             ])->render()))
+            ->headerActions([
+                Tables\Actions\Action::make('exportExcel')
+                    ->label('Export Excel')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
+                    ->url(route('equipment.excel.export')),
+                Tables\Actions\Action::make('downloadTemplate')
+                    ->label('Download Template')
+                    ->icon('heroicon-o-download')
+                    ->url(route('equipment.excel.template')),
+                Tables\Actions\Action::make('importEquipment')
+                    ->label('Import Excel')
+                    ->icon('heroicon-o-upload')
+                    ->color('primary')
+                    ->modalHeading('Import Equipment from Excel')
+                    ->modalDescription('Upload an Excel file (.xlsx, .xls, or .csv) to import equipment.')
+                    ->form([
+                        Forms\Components\FileUpload::make('file')
+                            ->label('Select File')
+                            ->directory('imports')
+                            ->acceptedFileTypes(['.xlsx', '.xls', '.csv'])
+                            ->maxSize(10240)
+                            ->required(),
+                    ])
+                    ->action(function (array $data) {
+                        try {
+                            Excel::import(new EquipmentImport, $data['file']);
+                            
+                            Notification::make()
+                                ->success()
+                                ->title('Import Successful')
+                                ->body('Equipment data has been imported.')
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->danger()
+                                ->title('Import Failed')
+                                ->body('Error: ' . $e->getMessage())
+                                ->send();
+                        }
+                    }),
+            ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
@@ -676,13 +721,33 @@ class EquipmentResource extends Resource
     protected static function attachDocumentForm(): array
     {
         return [
+            Forms\Components\Toggle::make('link_existing')
+                ->label('Link to Existing Document')
+                ->live(),
+            Forms\Components\Select::make('existing_document_id')
+                ->label('Select Document to Link')
+                ->options(fn () => \App\Models\Document::whereIn('document_type', ['DR', 'PAR', 'ICS'])
+                    ->orderBy('title')
+                    ->pluck('title', 'id'))
+                ->searchable()
+                ->preload()
+                ->visible(fn (Get $get) => $get('link_existing'))
+                ->nullable(),
+            Forms\Components\TextInput::make('existing_document_id_alt')
+                ->label('Or Enter Document No.')
+                ->visible(fn (Get $get) => $get('link_existing'))
+                ->nullable(),
             Forms\Components\Select::make('document_type')
                 ->options(DocumentType::options())
-                ->required(),
-            Forms\Components\TextInput::make('document_no')->label('Document No.'),
-            Forms\Components\DatePicker::make('document_date')->default(now()),
+                ->required()
+                ->visible(fn (Get $get) => !$get('link_existing')),
+            Forms\Components\TextInput::make('document_no')->label('Document No.')
+                ->visible(fn (Get $get) => !$get('link_existing')),
+            Forms\Components\DatePicker::make('document_date')->default(now())
+                ->visible(fn (Get $get) => !$get('link_existing')),
             Forms\Components\TextInput::make('title')->required()->columnSpanFull(),
-            Forms\Components\Textarea::make('description')->columnSpanFull(),
+            Forms\Components\Textarea::make('description')->columnSpanFull()
+                ->visible(fn (Get $get) => !$get('link_existing')),
             Forms\Components\FileUpload::make('file_path')
                 ->label('File')
                 ->disk('public')
@@ -690,12 +755,30 @@ class EquipmentResource extends Resource
                 ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
                 ->maxSize(10240)
                 ->required()
+                ->visible(fn (Get $get) => !$get('link_existing'))
                 ->columnSpanFull(),
         ];
     }
 
     protected static function attachDocumentHandler(Equipment $record, array $data): void
     {
+        $linkExisting = $data['link_existing'] ?? false;
+
+        if ($linkExisting && !empty($data['existing_document_id'])) {
+            // Link to existing document
+            $doc = \App\Models\Document::find($data['existing_document_id']);
+            if ($doc) {
+                $doc->update(['equipment_id' => $record->id]);
+                Notification::make()
+                    ->success()
+                    ->title('Document linked')
+                    ->body("Now linked to {$doc->title}")
+                    ->send();
+            }
+            return;
+        }
+
+        // Create new document (current behavior)
         Document::create([
             'school_id' => $record->school_id,
             'equipment_id' => $record->id,
@@ -724,7 +807,7 @@ class EquipmentResource extends Resource
             ->label('Document')
             ->icon('heroicon-o-document-arrow-down')
             ->color('success')
-            ->visible(fn (Equipment $record) => $record->hasSharedDocument())
+            ->visible(fn (Equipment $record) => $record->hasSharedDocument() && $record->sharedDocument()?->file_path)
             ->url(fn (Equipment $record) => Storage::disk('public')->url($record->sharedDocument()->file_path))
             ->openUrlInNewTab();
     }
@@ -739,7 +822,7 @@ class EquipmentResource extends Resource
             ->icon('heroicon-o-document-plus')
             ->color('warning')
             ->visible(fn (Equipment $record) => ! $record->hasSharedDocument())
-            ->modalHeading('Attach a document to this equipment')
+            ->modalHeading('Attach or Link Document')
             ->modalSubmitActionLabel('Upload')
             ->form(self::attachDocumentForm())
             ->action(fn (Equipment $record, array $data) => self::attachDocumentHandler($record, $data));
@@ -754,7 +837,7 @@ class EquipmentResource extends Resource
             ->label('Document')
             ->icon('heroicon-o-document-arrow-down')
             ->color('success')
-            ->visible(fn (Equipment $record) => $record->hasSharedDocument())
+            ->visible(fn (Equipment $record) => $record->hasSharedDocument() && $record->sharedDocument()?->file_path)
             ->url(fn (Equipment $record) => Storage::disk('public')->url($record->sharedDocument()->file_path))
             ->openUrlInNewTab();
     }
@@ -769,7 +852,7 @@ class EquipmentResource extends Resource
             ->icon('heroicon-o-document-plus')
             ->color('warning')
             ->visible(fn (Equipment $record) => ! $record->hasSharedDocument())
-            ->modalHeading('Attach a document to this equipment')
+            ->modalHeading('Attach or Link Document')
             ->modalSubmitActionLabel('Upload')
             ->form(self::attachDocumentForm())
             ->action(fn (Equipment $record, array $data) => self::attachDocumentHandler($record, $data));
