@@ -258,18 +258,35 @@ class EmployeeResource extends Resource
                         Forms\Components\FileUpload::make('file')
                             ->label('Select File')
                             ->directory('imports')
-                            ->acceptedFileTypes(['.xlsx', '.xls', '.csv'])
+                            ->acceptedFileTypes([
+                                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                'application/vnd.ms-excel',
+                                'text/csv',
+                                'text/plain',
+                                'application/csv',
+                                '.csv',
+                            ])
                             ->maxSize(10240)
                             ->required(),
                     ])
                     ->action(function (array $data) {
                         try {
-                            \Maatwebsite\Excel\Facades\Excel::import(new \App\Imports\EmployeeImport, $data['file']);
+                            $import = new \App\Imports\EmployeeImport();
+                            \Maatwebsite\Excel\Facades\Excel::import($import, $data['file'], 'public');
+
+                            if ($import->getRowCount() === 0) {
+                                \Filament\Notifications\Notification::make()
+                                    ->warning()
+                                    ->title('Import Skipped')
+                                    ->body('The uploaded file was empty or contained no valid employee rows.')
+                                    ->send();
+                                return;
+                            }
 
                             \Filament\Notifications\Notification::make()
                                 ->success()
                                 ->title('Import Successful')
-                                ->body('Employee data has been imported.')
+                                ->body($import->getRowCount() . ' employee records have been imported or updated.')
                                 ->send();
                         } catch (\Exception $e) {
                             \Filament\Notifications\Notification::make()

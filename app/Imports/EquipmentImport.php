@@ -7,13 +7,22 @@ use App\Models\School;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
-class EquipmentImport implements ToModel, WithHeadingRow, WithValidation
+class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmptyRows
 {
+    private int $rowsImported = 0;
+
+    public function getRowCount(): int
+    {
+        return $this->rowsImported;
+    }
     public function model(array $row)
     {
+        $this->rowsImported++;
+
         // Find school by name or code, create if not exists
         $school = null;
         if (!empty($row['school'])) {
@@ -73,6 +82,24 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation
             'model' => ['nullable', 'string', 'max:255'],
             'school' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    public function prepareForValidation($data, $index)
+    {
+        if (isset($data['property_no'])) {
+            $data['property_no'] = (string) $data['property_no'];
+        }
+        if (isset($data['equipment_type'])) {
+            $data['equipment_type'] = (string) $data['equipment_type'];
+        }
+        if (isset($data['brand'])) {
+            $data['brand'] = (string) $data['brand'];
+        }
+        if (isset($data['model'])) {
+            $data['model'] = (string) $data['model'];
+        }
+        
+        return $data;
     }
 
     public function onFailure(\Maatwebsite\Excel\Validators\Failure $failures)

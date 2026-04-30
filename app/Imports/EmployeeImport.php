@@ -7,13 +7,23 @@ use App\Models\School;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
+use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
-class EmployeeImport implements ToModel, WithHeadingRow, WithValidation
+class EmployeeImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmptyRows
 {
+    private int $rowsImported = 0;
+
+    public function getRowCount(): int
+    {
+        return $this->rowsImported;
+    }
+
     public function model(array $row)
     {
+        $this->rowsImported++;
+        
         $school = null;
         if (!empty($row['school'])) {
             $school = School::where('name', 'like', '%' . $row['school'] . '%')
@@ -69,6 +79,21 @@ class EmployeeImport implements ToModel, WithHeadingRow, WithValidation
             'last_name' => ['required', 'string', 'max:255'],
             'school' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    public function prepareForValidation($data, $index)
+    {
+        if (isset($data['employee_number'])) {
+            $data['employee_number'] = (string) $data['employee_number'];
+        }
+        if (isset($data['first_name'])) {
+            $data['first_name'] = (string) $data['first_name'];
+        }
+        if (isset($data['last_name'])) {
+            $data['last_name'] = (string) $data['last_name'];
+        }
+        
+        return $data;
     }
 
     public function onFailure(\Maatwebsite\Excel\Validators\Failure $failures)

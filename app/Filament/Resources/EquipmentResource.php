@@ -509,18 +509,35 @@ class EquipmentResource extends Resource
                         Forms\Components\FileUpload::make('file')
                             ->label('Select File')
                             ->directory('imports')
-                            ->acceptedFileTypes(['.xlsx', '.xls', '.csv'])
+                            ->acceptedFileTypes([
+                                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                'application/vnd.ms-excel',
+                                'text/csv',
+                                'text/plain',
+                                'application/csv',
+                                '.csv',
+                            ])
                             ->maxSize(10240)
                             ->required(),
                     ])
                     ->action(function (array $data) {
                         try {
-                            Excel::import(new EquipmentImport, $data['file']);
+                            $import = new \App\Imports\EquipmentImport();
+                            Excel::import($import, $data['file'], 'public');
                             
+                            if ($import->getRowCount() === 0) {
+                                Notification::make()
+                                    ->warning()
+                                    ->title('Import Skipped')
+                                    ->body('The uploaded file was empty or contained no valid equipment rows.')
+                                    ->send();
+                                return;
+                            }
+
                             Notification::make()
                                 ->success()
                                 ->title('Import Successful')
-                                ->body('Equipment data has been imported.')
+                                ->body($import->getRowCount() . ' equipment records have been imported or updated.')
                                 ->send();
                         } catch (\Exception $e) {
                             Notification::make()
