@@ -137,7 +137,7 @@ class Employee extends Model
      */
     public function documents(): HasMany
     {
-        return $this->hasMany(Document::class, "uploaded_by_id");
+        return $this->hasMany(Document::class, "employee_id");
     }
 
     public function getDisplayNameAttribute(): string
