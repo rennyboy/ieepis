@@ -34,7 +34,7 @@ class SetupSchoolProfile extends Page
     {
         // If user already has a school, redirect them
         if (Auth::user()->school_id) {
-            redirect('/admin');
+            $this->redirect('/admin');
         }
 
         $this->form->fill();
@@ -145,6 +145,9 @@ class SetupSchoolProfile extends Page
         if ($employee->school_id !== $school->id) {
             $employee->update(['school_id' => $school->id]);
         }
+
+        // Update user school_id for direct access
+        $user->update(['school_id' => $school->id]);
 
         // 3. Create Employees
         if (!empty($data['employees'])) {
