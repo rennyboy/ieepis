@@ -4,6 +4,7 @@ namespace App\Filament\Resources\UserResource\Pages;
 
 use App\Filament\Resources\UserResource;
 use App\Models\Employee;
+use App\Models\User;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
@@ -15,7 +16,41 @@ class EditUser extends EditRecord
 
     protected function getHeaderActions(): array
     {
-        return [Actions\DeleteAction::make()];
+        return [
+            Actions\DeleteAction::make(),
+            Actions\Action::make('resetPassword')
+                ->label('Reset Password')
+                ->icon('heroicon-o-key')
+                ->color('warning')
+                ->modalHeading('Reset User Password')
+                ->modalDescription(fn (User $record) => "Set a new password for {$record->email}.")
+                ->form([
+                    \Filament\Forms\Components\TextInput::make('new_password')
+                        ->label('New Password')
+                        ->password()
+                        ->required()
+                        ->minLength(8),
+                    \Filament\Forms\Components\TextInput::make('new_password_confirmation')
+                        ->label('Confirm Password')
+                        ->password()
+                        ->required()
+                        ->same('new_password'),
+                ])
+                ->action(function (User $record, array $data): void {
+                    $record->password = \Illuminate\Support\Facades\Hash::make($data['new_password']);
+                    $record->save();
+
+                    \Filament\Notifications\Notification::make()
+                        ->title('Password reset')
+                        ->body("Password for {$record->email} has been reset by " . \Illuminate\Support\Facades\Auth::user()?->name . '.')
+                        ->sendToDatabase(collect([$record]));
+
+                    \Filament\Notifications\Notification::make()->title('Password reset successfully')->success()->send();
+                })
+                ->visible(fn ($record) => $record instanceof User
+                    && ! $record->hasRole('super-admin')
+                    && (\Illuminate\Support\Facades\Auth::user()?->hasRole('super-admin'))),
+        ];
     }
 
     protected function mutateFormDataBeforeSave(array $data): array
