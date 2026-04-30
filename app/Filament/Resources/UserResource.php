@@ -130,6 +130,38 @@ class UserResource extends Resource
             ])
             ->actions([
                 EditAction::make(),
+                Action::make('resetPassword')
+                    ->label('Reset Password')
+                    ->icon('heroicon-o-key')
+                    ->color('warning')
+                    ->modalHeading('Reset User Password')
+                    ->modalDescription(fn (User $record) => "Set a new password for {$record->email}.")
+                    ->form([
+                        TextInput::make('new_password')
+                            ->label('New Password')
+                            ->password()
+                            ->required()
+                            ->minLength(8),
+                        TextInput::make('new_password_confirmation')
+                            ->label('Confirm Password')
+                            ->password()
+                            ->required()
+                            ->same('new_password'),
+                    ])
+                    ->action(function (User $record, array $data): void {
+                        $record->password = Hash::make($data['new_password']);
+                        $record->save();
+
+                        Notification::make()
+                            ->title('Password reset')
+                            ->body("Password for {$record->email} has been reset by " . Auth::user()?->name . '.')
+                            ->sendToDatabase(collect([$record]));
+
+                        Notification::make()->title('Password reset successfully')->success()->send();
+                    })
+                    ->visible(fn ($record) => $record instanceof User
+                        && ! $record->hasRole('super-admin')
+                        && (Auth::user()?->hasRole('super-admin'))),
                 Action::make('reassignEmployee')
                     ->label('Reassign Employee')
                     ->icon('heroicon-o-arrow-path')
@@ -204,6 +236,10 @@ class UserResource extends Resource
 
         if (in_array($action, ['view', 'create', 'delete', 'forceDelete', 'restore'], true)) {
             return $user->hasRole(['super-admin', 'sdo-admin']);
+        }
+
+        if ($action === 'resetPassword') {
+            return $user->hasRole('super-admin');
         }
 
         if ($action === 'edit') {
