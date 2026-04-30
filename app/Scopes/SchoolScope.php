@@ -39,12 +39,19 @@ class SchoolScope implements Scope
         // Skip filtering if:
         // 1. No user is authenticated
         // 2. User is a super-admin
-        // 3. User has no school_id assigned
-        if (!$user || $user->hasRole('super-admin') || !$user->school_id) {
+        if (!$user || $user->hasRole('super-admin')) {
+            return;
+        }
+
+        // Get school_id from user column (direct access, safe)
+        $schoolId = $user->school_id;
+
+        // Skip if no school_id
+        if (!$schoolId) {
             return;
         }
 
         // Filter by user's school_id
-        $builder->where('school_id', $user->school_id);
+        $builder->where('school_id', $schoolId);
     }
 }

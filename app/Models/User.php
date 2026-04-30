@@ -44,7 +44,7 @@ class User extends Authenticatable implements FilamentUser
 {
     use HasFactory, HasRoles, Notifiable;
 
-    protected $fillable = ['email', 'password', 'approval_status', 'google_id'];
+    protected $fillable = ['email', 'password', 'approval_status', 'google_id', 'school_id'];
 
     protected $hidden = ['password', 'remember_token'];
 
@@ -71,7 +71,7 @@ class User extends Authenticatable implements FilamentUser
 
     public function getSchoolIdAttribute(): ?int
     {
-        return $this->employee?->school_id;
+        return $this->school_id ?? $this->employee?->school_id;
     }
 
     public function getDivisionIdAttribute(): ?int

@@ -23,7 +23,7 @@ Track ICT equipment inventory, accountability/assignment history (PAR, ICS, RRSP
 ## Stack
 - PHP 8.4, Laravel 11, FilamentPHP v3, Livewire v3, Tailwind v3
 - Database: PostgreSQL 14+ or MySQL 8.0+ — keep DB-agnostic (Schema builder, no driver-specific SQL)
-- Laravel Sail (Docker dev) — prefix every command with `vendor/bin/sail`
+- **Local dev (no Docker)** — run `php artisan ...`, `php -S`, `composer ...`, `npm ...` directly. Sail is no longer used (CPU-saving, see Decision 014). `docker-compose.yml` and `docker/` stay in repo for reference but aren't invoked.
 - Spatie Permission, Spatie ActivityLog, PHPUnit 11 (NOT Pest)
 - Laravel Boost MCP: `search-docs`, `database-query`, `database-schema`, `browser-logs`
 
@@ -46,4 +46,4 @@ For full Laravel/Filament conventions see `.ai/laravel-boost.md`.
 3. Reporting / DCP dashboard
 
 ## Constraints
-- No framework upgrades without approval. App is stateless HTTP only. No business logic in controllers — use service classes. All commands via Sail.
+- No framework upgrades without approval. App is stateless HTTP only. No business logic in controllers — use service classes. **Run commands locally — never via Sail/Docker** (Decision 014 supersedes 006).
