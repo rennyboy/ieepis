@@ -44,4 +44,10 @@ Route::middleware(['auth', 'role:super-admin|sdo-admin|school-admin'])->group(fu
 
     Route::post('employees/excel/import', [EmployeeExcelController::class, 'import'])
         ->name('employees.excel.import');
+
+    Route::post('scanner/resolve', [\App\Http\Controllers\OfflineSyncController::class, 'resolve'])
+        ->name('scanner.resolve');
+        
+    Route::post('scanner/sync', [\App\Http\Controllers\OfflineSyncController::class, 'sync'])
+        ->name('scanner.sync');
 });
