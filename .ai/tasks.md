@@ -25,7 +25,6 @@
 - [ ] Wire `ReassignmentAudit` to a Resource
 - [ ] Move `LIST OF EMPLOYEES 03.09.csv` out of repo root (import via seeder, then archive)
 - [ ] Archive legacy `*_DEPLOYMENT*.md` / completion docs into `docs/`
-- [ ] Expand PWA Offline Capabilities (Vue component for offline equipment addition and searching)
 
 ## Done
 - See root `TASKS.md` `## ✅ Completed` section

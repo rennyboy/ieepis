@@ -47,7 +47,13 @@ Route::middleware(['auth', 'role:super-admin|sdo-admin|school-admin'])->group(fu
 
     Route::post('scanner/resolve', [\App\Http\Controllers\OfflineSyncController::class, 'resolve'])
         ->name('scanner.resolve');
-        
+
     Route::post('scanner/sync', [\App\Http\Controllers\OfflineSyncController::class, 'sync'])
         ->name('scanner.sync');
+
+    Route::get('equipment/offline/cache', [\App\Http\Controllers\OfflineEquipmentController::class, 'index'])
+        ->name('equipment.offline.cache');
+
+    Route::post('equipment/offline/sync', [\App\Http\Controllers\OfflineEquipmentController::class, 'store'])
+        ->name('equipment.offline.sync');
 });
