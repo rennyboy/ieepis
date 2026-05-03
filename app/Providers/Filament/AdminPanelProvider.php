@@ -149,6 +149,11 @@ class AdminPanelProvider extends PanelProvider
                     'userRole' => Auth::user()?->getRoleNames()->first() ?? 'User',
                     'schoolName' => Auth::user()?->school?->name ?? null,
                 ]),
+            )
+            // ✅ PWA Meta Tags and Service Worker
+            ->renderHook(
+                'panels::head.end',
+                fn() => view('filament.pwa-head'),
             );
     }
 }

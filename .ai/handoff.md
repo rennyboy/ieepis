@@ -1,25 +1,22 @@
 # Session Handoff
 
 ## Last Updated
-2026-04-29
+2026-05-03
 
 ## What Was Completed
-Phase 1 Complete (Laravel 12 upgrade):
-- composer.json: Laravel 11→12, Sanctum 4, DomPDF 3
-- composer update successful (v12.58.0)
-- Sanctum config published
-- Ticket.php: MySQL GET_LOCK → PostgreSQL pg_advisory_xact_lock
-- App boots: OK, Filament loads at /admin
-- Implementation plan written to IMPLEMENTATION_PLAN.md
+- Configured application as a Progressive Web App (PWA) with manifest.json and sw.js.
+- Integrated a Hybrid Vue 3 component inside Laravel Filament for Offline QR Scanning.
+- Established `OfflineScanner.vue` which saves scans to IndexedDB (`localforage`) when offline and syncs automatically when online.
+- Created `OfflineSyncController` to handle batch sync via `routes/web.php`.
+- Created deployment guide for Dokploy (`DOKPLOY_DEPLOYMENT.md`).
 
 ## Current Blockers
 - None.
 
 ## Immediate Next Actions
-1. Phase 2: API Foundation — scaffold API controllers + routes
-2. Test in browser: Visit /admin to verify Filament works post-upgrade
+- Verify PWA installability on physical mobile devices.
+- Begin PHPUnit coverage or proceed with Bulk QR export depending on priorities.
 
 ## Notes for Next Session
-- **Database**: PostgreSQL retained (appropriate for current scale)
-- AssignmentService is the sole sanctioned write path; PWA API controllers MUST call it
-- All API writes go through AssignmentService same as Filament
+- The app uses Vue 3 inside Vite specifically for the offline scanner (no Nuxt.js/Inertia).
+- Full offline form addition/searching is on the backlog and will use the same Vue 3 architecture.
