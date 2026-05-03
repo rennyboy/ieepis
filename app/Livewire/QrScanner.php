@@ -32,12 +32,33 @@ class QrScanner extends Component
         $code = is_array($data) && isset($data['value']) ? $data['value'] : (is_string($data) ? $data : '');
         
         $this->scanning = false;
-        $response = Http::get('/api/qr/' . $code);
-        if ($response->successful()) {
-            $redirect = $response->json('redirect');
-            return redirect($redirect);
+
+        if (!$code) {
+            $this->errorMessage = 'Invalid QR Code scanned.';
+            return;
         }
-        $this->errorMessage = $response->json('message') ?? 'Unexpected error';
+
+        $parts = explode('-', $code);
+        if (count($parts) !== 2) {
+            $this->errorMessage = 'Unrecognized QR Code format.';
+            return;
+        }
+
+        [$prefix, $id] = $parts;
+
+        try {
+            if ($prefix === 'EQ') {
+                $equipment = \App\Models\Equipment::withTrashed()->findOrFail($id);
+                return redirect(\App\Filament\Resources\EquipmentResource::getUrl('edit', ['record' => $equipment]));
+            } elseif ($prefix === 'EM') {
+                $employee = \App\Models\Employee::withTrashed()->findOrFail($id);
+                return redirect(\App\Filament\Resources\EmployeeResource::getUrl('edit', ['record' => $employee]));
+            } else {
+                $this->errorMessage = 'Unknown QR prefix.';
+            }
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            $this->errorMessage = 'Record not found.';
+        }
     }
 
     // Manual entry submission
