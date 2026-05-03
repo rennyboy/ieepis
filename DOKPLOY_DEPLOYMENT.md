@@ -46,7 +46,7 @@ Before deploying the Laravel app, we need the database running.
    - **Password**: *Generate a secure password*
    - **Version**: `14` or later
 4. Click **Deploy**.
-5. Once deployed, note down the internal connection details provided by Dokploy (you will need these for the Laravel `.env` file). The internal host will usually just be the service name, e.g., `ieepis-db`.
+5. Once deployed, note down the internal connection details provided by Dokploy (you will need these for the Laravel `.env` file). The internal host will   usually just be the service name, e.g., `ieepis-db`.
 
 ---
 

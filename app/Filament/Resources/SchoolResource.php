@@ -143,7 +143,7 @@ class SchoolResource extends Resource
                 Tables\Columns\TextColumn::make('equipment_count')
                     ->label('Equipment')
                     ->badge()->color('primary')
-                    ->getStateUsing(fn (School $record) => $record->equipment()->count()),
+                    ->counts('equipment'),
                 Tables\Columns\TextColumn::make('employees_count')
                     ->label('Personnel')
                     ->badge()->color('warning')

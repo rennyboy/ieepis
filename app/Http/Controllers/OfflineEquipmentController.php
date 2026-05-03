@@ -3,16 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Equipment;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class OfflineEquipmentController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(): JsonResponse
     {
         $equipment = Equipment::query()
             ->select([
@@ -55,10 +57,12 @@ class OfflineEquipmentController extends Controller
 
         $synced = [];
         $failed = [];
-        $defaultSchoolId = Auth::user()?->getAttribute('school_id');
+        $user = Auth::user();
+        $defaultSchoolId = $user?->school_id;
 
         foreach ($entries as $entry) {
             $clientId = $entry['client_id'] ?? null;
+            $propertyNo = $entry['property_no'] ?? null;
 
             try {
                 $data = $this->validateEntry($entry, $defaultSchoolId);
@@ -73,14 +77,33 @@ class OfflineEquipmentController extends Controller
             } catch (ValidationException $e) {
                 $failed[] = [
                     'client_id' => $clientId,
-                    'property_no' => $entry['property_no'] ?? null,
+                    'property_no' => $propertyNo,
                     'errors' => $e->errors(),
                 ];
-            } catch (\Throwable $e) {
+            } catch (QueryException $e) {
+                Log::warning('Offline equipment sync DB error', [
+                    'client_id' => $clientId,
+                    'property_no' => $propertyNo,
+                    'sql_state' => $e->getCode(),
+                    'message' => $e->getMessage(),
+                ]);
+
                 $failed[] = [
                     'client_id' => $clientId,
-                    'property_no' => $entry['property_no'] ?? null,
-                    'errors' => ['exception' => [$e->getMessage()]],
+                    'property_no' => $propertyNo,
+                    'errors' => ['database' => ['Could not save entry — please retry or contact an administrator.']],
+                ];
+            } catch (\Throwable $e) {
+                Log::error('Offline equipment sync unexpected error', [
+                    'client_id' => $clientId,
+                    'property_no' => $propertyNo,
+                    'exception' => $e,
+                ]);
+
+                $failed[] = [
+                    'client_id' => $clientId,
+                    'property_no' => $propertyNo,
+                    'errors' => ['server' => ['Internal error — please retry later.']],
                 ];
             }
         }
