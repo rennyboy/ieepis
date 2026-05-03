@@ -16,6 +16,7 @@ class QrScanner extends Component
     {
         $this->scanning = true;
         $this->errorMessage = null;
+        $this->dispatchBrowserEvent('qr-start');
     }
 
     public function stopScanning()
