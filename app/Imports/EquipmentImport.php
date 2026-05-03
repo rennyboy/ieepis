@@ -23,45 +23,74 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
     {
         $this->rowsImported++;
 
-        // Find school by name or code, create if not exists
+        // Advanced keyword-based matching for complex headers
+        $get = function (array $row, array $keywords, array $exclude = [], $default = null) {
+            foreach ($row as $rowKey => $rowValue) {
+                $normalizedKey = strtolower($rowKey);
+                
+                // Exclude if it contains unwanted keywords (e.g. 'old' when looking for current property)
+                $shouldExclude = false;
+                foreach ($exclude as $ex) {
+                    if (str_contains($normalizedKey, strtolower($ex))) {
+                        $shouldExclude = true;
+                        break;
+                    }
+                }
+                if ($shouldExclude) continue;
+
+                // Try keyword combination match
+                $allMatch = true;
+                foreach ($keywords as $kw) {
+                    if (!str_contains($normalizedKey, strtolower($kw))) {
+                        $allMatch = false;
+                        break;
+                    }
+                }
+                if ($allMatch) return $rowValue;
+            }
+            return $default;
+        };
+
+        // Find school by name or code
+        $schoolVal = $get($row, ['school']) ?? $get($row, ['station']) ?? $get($row, ['office']);
         $school = null;
-        if (!empty($row['school'])) {
-            $school = School::where('name', 'like', '%' . $row['school'] . '%')
-                ->orWhere('school_code', $row['school'])
+        if (!empty($schoolVal)) {
+            $school = School::where('name', 'like', '%' . $schoolVal . '%')
+                ->orWhere('school_code', $schoolVal)
                 ->first();
         }
 
-        // If no school found, use current user's school
         $schoolId = $school?->id ?? Auth::user()?->school_id;
 
-        // Check if property_no already exists
-        $existingEquipment = Equipment::where('property_no', $row['property_no'])->first();
+        // Strict mapping for property_no to avoid 'old_property_no'
+        $propertyNo = $get($row, ['property', 'no'], ['old', 'previous']) ?? $get($row, ['asset', 'id']);
+        $existingEquipment = Equipment::where('property_no', $propertyNo)->first();
 
         $equipmentData = [
             'school_id' => $schoolId,
-            'property_no' => $row['property_no'],
-            'old_property_no' => $row['old_property_no'] ?? null,
-            'serial_number' => $row['serial_number'] ?? null,
-            'equipment_type' => $row['equipment_type'] ?? $row['type'] ?? null,
-            'brand' => $row['brand'] ?? null,
-            'model' => $row['model'] ?? null,
-            'specifications' => $row['specifications'] ?? null,
-            'category' => $row['category'] ?? 'High-Value',
-            'classification' => $row['classification'] ?? 'Machinery and Equipment for ICT',
-            'is_dcp' => in_array(strtolower($row['is_dcp'] ?? ''), ['yes', 'true', '1']),
-            'dcp_package' => $row['dcp_package'] ?? null,
-            'dcp_year' => $row['dcp_year'] ?? null,
-            'condition' => $row['condition'] ?? 'Good',
-            'is_functional' => !in_array(strtolower($row['is_functional'] ?? ''), ['no', 'false', '0']),
-            'accountability_status' => $row['accountability_status'] ?? 'unassigned',
-            'acquisition_cost' => $row['acquisition_cost'] ?? null,
-            'acquisition_date' => $this->parseDate($row['acquisition_date'] ?? null),
-            'mode_of_acquisition' => $row['mode_of_acquisition'] ?? null,
-            'source_of_acquisition' => $row['source_of_acquisition'] ?? null,
-            'supplier' => $row['supplier'] ?? null,
-            'warranty_end_date' => $this->parseDate($row['warranty_end_date'] ?? null),
-            'equipment_location' => $row['equipment_location'] ?? null,
-            'remarks' => $row['remarks'] ?? null,
+            'property_no' => $propertyNo,
+            'old_property_no' => $get($row, ['old', 'property']) ?? $get($row, ['previous', 'property']),
+            'serial_number' => $get($row, ['serial', 'no']) ?? $get($row, ['sn']) ?? $get($row, ['s/n']),
+            'equipment_type' => $get($row, ['item', 'dropdown']) ?? $get($row, ['equipment', 'type']) ?? $get($row, ['item', 'type']),
+            'brand' => $get($row, ['brand']) ?? $get($row, ['manufacturer']),
+            'model' => $get($row, ['model']),
+            'specifications' => $get($row, ['specifications']) ?? $get($row, ['specs']),
+            'category' => $get($row, ['category']) ?? 'High-Value',
+            'classification' => $get($row, ['classification']) ?? 'Machinery and Equipment for ICT',
+            'is_dcp' => !in_array(strtolower($get($row, ['non', 'dcp']) ?? 'yes'), ['yes', 'true', '1', '✓', 'x']),
+            'dcp_package' => $get($row, ['dcp', 'package']) ?? $get($row, ['batch', 'name']),
+            'dcp_year' => $get($row, ['dcp', 'year']) ?? $get($row, ['batch', 'year']) ?? $get($row, ['batch']),
+            'condition' => $get($row, ['condition']) ?? 'Good',
+            'is_functional' => !in_array(strtolower($get($row, ['non', 'functional']) ?? ''), ['yes', 'true', '1', '✓', 'x']),
+            'accountability_status' => $get($row, ['accountability']) ?? $get($row, ['assignment']) ?? 'unassigned',
+            'acquisition_cost' => $get($row, ['cost']) ?? $get($row, ['amount']),
+            'acquisition_date' => $this->parseDate($get($row, ['date', 'acquired']) ?? $get($row, ['date', 'received'])),
+            'mode_of_acquisition' => $get($row, ['mode', 'acquisition']),
+            'source_of_acquisition' => $get($row, ['source', 'acquisition']),
+            'supplier' => $get($row, ['supplier']) ?? $get($row, ['vendor']),
+            'warranty_end_date' => $this->parseDate($get($row, ['warranty', 'end'])),
+            'equipment_location' => $get($row, ['location']) ?? $get($row, ['room']),
+            'remarks' => $get($row, ['remarks']),
         ];
 
         if ($existingEquipment) {
