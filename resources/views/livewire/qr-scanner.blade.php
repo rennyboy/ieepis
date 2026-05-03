@@ -38,16 +38,42 @@
 @push('scripts')
 <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
 <script>
-    document.addEventListener('livewire:load', () => {
+    document.addEventListener('livewire:init', () => {
         if (window.Html5Qrcode) {
-            const html5QrCode = new Html5Qrcode('qr-reader');
-            const config = { fps: 10, qrbox: 250 };
-            window.addEventListener('qr-start', () => {
-                html5QrCode.start({ facingMode: 'environment' }, config, code => {
-                    Livewire.emit('handleScannedCode', code);
-                    html5QrCode.stop();
+            Livewire.on('qr-start', () => {
+                const html5QrCode = new Html5Qrcode('qr-reader');
+                
+                Html5Qrcode.getCameras().then(devices => {
+                    if (devices && devices.length) {
+                        // Prefer back camera if available
+                        let cameraId = devices[0].id;
+                        devices.forEach(device => {
+                            if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('environment')) {
+                                cameraId = device.id;
+                            }
+                        });
+
+                        html5QrCode.start(
+                            cameraId,
+                            { fps: 10, qrbox: 250 },
+                            (decodedText) => {
+                                html5QrCode.stop();
+                                Livewire.dispatch('qr-scanned', { value: decodedText });
+                            }
+                        ).catch(err => console.error(err));
+                    } else {
+                        // Fallback to environment facing mode
+                        html5QrCode.start(
+                            { facingMode: 'environment' }, 
+                            { fps: 10, qrbox: 250 }, 
+                            (decodedText) => {
+                                html5QrCode.stop();
+                                Livewire.dispatch('qr-scanned', { value: decodedText });
+                            }
+                        ).catch(err => console.error(err));
+                    }
                 }).catch(err => {
-                    Livewire.emit('errorMessage', err);
+                    console.error("Camera error:", err);
                 });
             });
         }

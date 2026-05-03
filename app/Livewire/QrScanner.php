@@ -1,5 +1,5 @@
 <?php
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
 use Livewire\Component;
 use Illuminate\Support\Facades\Http;
@@ -12,11 +12,13 @@ class QrScanner extends Component
 
     // Mobile detection via Alpine (client side). The component itself does not enforce, but the view hides UI when not mobile.
 
+    protected $listeners = ['qr-scanned' => 'handleScannedCode'];
+
     public function startScanning()
     {
         $this->scanning = true;
         $this->errorMessage = null;
-        $this->dispatchBrowserEvent('qr-start');
+        $this->dispatch('qr-start');
     }
 
     public function stopScanning()
@@ -25,8 +27,10 @@ class QrScanner extends Component
     }
 
     // Called from JavaScript when a QR code is read
-    public function handleScannedCode(string $code)
+    public function handleScannedCode($data)
     {
+        $code = is_array($data) && isset($data['value']) ? $data['value'] : (is_string($data) ? $data : '');
+        
         $this->scanning = false;
         $response = Http::get('/api/qr/' . $code);
         if ($response->successful()) {
