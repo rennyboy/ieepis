@@ -10,7 +10,8 @@ class EmployeePdfController extends Controller
     public function generateBulkPdf()
     {
         $employees = Employee::query()
-            ->with(['school', 'activeAssignments'])
+            ->with('school')
+            ->withCount('activeAssignments')
             ->orderBy('last_name')
             ->get();
 

@@ -145,11 +145,6 @@ class Employee extends Model
         return "{$this->full_name} ({$this->employee_number})";
     }
 
-    public function getCurrentEquipmentCountAttribute(): int
-    {
-        return $this->activeAssignments()->count();
-    }
-
     public function scopeActive($query)
     {
         return $query->where("status", "active");

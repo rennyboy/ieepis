@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\Ticket;
 use App\Observers\TicketObserver;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -21,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
         Ticket::observe(TicketObserver::class);
 
         $this->configureRateLimiters();
+
+        Model::preventLazyLoading(! $this->app->isProduction());
     }
 
     private function configureRateLimiters(): void

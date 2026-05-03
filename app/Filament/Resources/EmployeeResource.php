@@ -204,13 +204,11 @@ class EmployeeResource extends Resource
                         'info' => 'teaching',
                         'warning' => 'non-teaching',
                     ]),
-                Tables\Columns\TextColumn::make('current_equipment_count')
+                Tables\Columns\TextColumn::make('active_assignments_count')
                     ->label('Equipment')
                     ->badge()
                     ->color('primary')
-                    ->getStateUsing(
-                        fn (Employee $r) => $r->activeAssignments()->count(),
-                    ),
+                    ->counts('activeAssignments'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->colors([
