@@ -10,8 +10,12 @@ use Illuminate\Support\Facades\Auth;
 /**
  * SchoolScope - Global Query Scope for school-based filtering
  *
- * This scope automatically filters models by school_id for non-super-admin users.
- * It ensures that users can only see data from their assigned school.
+ * Filters scoped models to the auth user's school_id.
+ *
+ * Bypassed for:
+ * - super-admin (full system access)
+ * - technician (cross-school field support — must see all schools' records)
+ * - any user without a resolvable school_id (e.g. sdo-admin)
  *
  * Apply to models with school_id column:
  * - EquipmentAssignment
@@ -19,6 +23,7 @@ use Illuminate\Support\Facades\Auth;
  * - Employee
  * - Document
  * - Ticket
+ * - InternetConnection
  *
  * Usage in model:
  * protected static function booted(): void
@@ -45,7 +50,7 @@ class SchoolScope implements Scope
 
         $user = Auth::user();
 
-        if (! $user instanceof \App\Models\User || $user->hasRole('super-admin')) {
+        if (! $user instanceof \App\Models\User || $user->hasAnyRole(['super-admin', 'technician'])) {
             return;
         }
 
