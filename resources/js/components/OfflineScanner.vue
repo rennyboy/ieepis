@@ -63,6 +63,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import localforage from 'localforage';
 import axios from 'axios';
+import { Html5Qrcode } from 'html5-qrcode';
 
 // State
 const scanning = ref(false);
@@ -193,53 +194,23 @@ const syncOfflineScans = async () => {
 
 // Camera Logic
 const startScanning = () => {
-  if (!window.Html5Qrcode) {
-    showMessage('Scanner library not loaded yet. Please wait a moment.');
-    return;
-  }
-
   scanning.value = true;
   message.value = { text: '', type: '' };
   
   // Need to wait for next tick for the DOM element to be visible
   setTimeout(() => {
-    html5QrCode = new window.Html5Qrcode('qr-reader-vue');
+    html5QrCode = new Html5Qrcode('qr-reader-vue');
     
-    window.Html5Qrcode.getCameras().then(devices => {
-      if (devices && devices.length) {
-        let cameraId = devices[0].id;
-        devices.forEach(device => {
-          if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('environment')) {
-            cameraId = device.id;
-          }
-        });
-
-        html5QrCode.start(
-          cameraId,
-          { fps: 10, qrbox: 250 },
-          (decodedText) => {
-            processScannedCode(decodedText);
-          }
-        ).catch(err => {
-          console.error(err);
-          showMessage('Could not start camera. Check permissions.');
-          stopScanning();
-        });
-      } else {
-        html5QrCode.start(
-          { facingMode: 'environment' }, 
-          { fps: 10, qrbox: 250 }, 
-          (decodedText) => {
-            processScannedCode(decodedText);
-          }
-        ).catch(err => {
-          console.error(err);
-          showMessage('Could not start camera. Check permissions.');
-          stopScanning();
-        });
+    html5QrCode.start(
+      { facingMode: 'environment' }, 
+      { fps: 10, qrbox: 250 }, 
+      (decodedText) => {
+        processScannedCode(decodedText);
       }
-    }).catch(err => {
-      showMessage('Camera error: ' + err.message);
+    ).catch(err => {
+      console.error(err);
+      const errorMsg = typeof err === 'string' ? err : (err?.message || 'Check camera permissions. iOS requires HTTPS.');
+      showMessage('Camera error: ' + errorMsg);
       stopScanning();
     });
   }, 100);
