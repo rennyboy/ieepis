@@ -18,7 +18,8 @@ class TicketResource extends Resource
         /** @var \App\Models\User $user */
         $user = \Illuminate\Support\Facades\Auth::user();
 
-        $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery()
+            ->with(['school', 'equipment', 'reporter', 'assignedTo']);
 
         $query->when(
             fn () => $user->hasRole('school-admin'),
@@ -65,13 +66,11 @@ class TicketResource extends Resource
                         ->label('Related Equipment')
                         ->relationship('equipment', 'model')
                         ->searchable()
-                        ->preload()
                         ->nullable(),
                     Forms\Components\Select::make('reporter_id')
                         ->label('Reported By')
                         ->relationship('reporter', 'full_name')
                         ->searchable()
-                        ->preload()
                         ->required(),
                     Forms\Components\TextInput::make('issue_title')
                         ->label('Issue Title')
@@ -108,7 +107,6 @@ class TicketResource extends Resource
                         ->label('Assigned Technician')
                         ->relationship('assignedTo', 'full_name')
                         ->searchable()
-                        ->preload()
                         ->nullable(),
                     Forms\Components\DateTimePicker::make('resolved_at')->label(
                         'Resolved At',

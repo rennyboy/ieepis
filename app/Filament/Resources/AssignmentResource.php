@@ -11,6 +11,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
@@ -55,7 +56,6 @@ class AssignmentResource extends Resource
                             fn (Equipment $record): string => "{$record->brand} {$record->model} ({$record->property_no})",
                         )
                         ->searchable(['brand', 'model', 'property_no', 'serial_number'])
-                        ->preload()
                         ->required()
                         ->disabledOn('edit'),
                     Forms\Components\Select::make('employee_id')
@@ -66,7 +66,6 @@ class AssignmentResource extends Resource
                             fn ($query) => $query->where('status', 'active'),
                         )
                         ->searchable()
-                        ->preload()
                         ->required(),
                     Forms\Components\Select::make('custodian_id')
                         ->label('Custodian / End User (if different)')
@@ -76,7 +75,6 @@ class AssignmentResource extends Resource
                             fn ($query) => $query->where('status', 'active'),
                         )
                         ->searchable()
-                        ->preload()
                         ->nullable(),
                     Forms\Components\Select::make('transaction_type')
                         ->options([
@@ -176,6 +174,12 @@ class AssignmentResource extends Resource
                 Tables\Actions\EditAction::make(),
             ])
             ->defaultSort('assigned_at', 'desc');
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['equipment', 'employee', 'custodian', 'school', 'assignedBy']);
     }
 
     public static function getPages(): array
