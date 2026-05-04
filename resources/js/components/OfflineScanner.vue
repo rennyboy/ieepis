@@ -43,7 +43,7 @@
           v-model="manualCode" 
           @keyup.enter="submitManual"
           class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition" 
-          placeholder="e.g. EQ-123" />
+          placeholder="e.g. EQ-123 or Property Number" />
         <button 
           @click="submitManual" 
           class="px-4 py-2 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-700 transition">
