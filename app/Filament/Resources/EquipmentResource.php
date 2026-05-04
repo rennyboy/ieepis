@@ -332,7 +332,6 @@ class EquipmentResource extends Resource
                                     ->orderBy('title')
                                     ->pluck('title', 'id'))
                                 ->searchable()
-                                ->preload()
                                 ->nullable(),
                             Forms\Components\Select::make(
                                 'transaction_type',
@@ -635,13 +634,13 @@ class EquipmentResource extends Resource
                             )->label('Location'),
                             Infolists\Components\TextEntry::make(
                                 'assignments_count',
-                            )->getStateUsing(fn ($record) => $record->assignments()->count())
+                            )->getStateUsing(fn ($record) => $record->assignments_count ?? $record->assignments()->count())
                                 ->label('Ownership Transfers')
                                 ->badge()
                                 ->color('success'),
                             Infolists\Components\TextEntry::make(
                                 'maintenance_tickets_count',
-                            )->getStateUsing(fn ($record) => $record->maintenanceTickets()->count())
+                            )->getStateUsing(fn ($record) => $record->maintenance_tickets_count ?? $record->maintenanceTickets()->count())
                                 ->label('Maintenance Performed')
                                 ->badge()
                                 ->color('warning'),
@@ -705,7 +704,9 @@ class EquipmentResource extends Resource
         /** @var \App\Models\User $user */
         $user = \Illuminate\Support\Facades\Auth::user();
 
-        $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery()
+            ->with(['activeAssignment.employee', 'document'])
+            ->withCount(['assignments', 'maintenanceTickets']);
 
         $query->when(
             fn () => $user->hasRole('school-admin'),
@@ -747,7 +748,6 @@ class EquipmentResource extends Resource
                     ->orderBy('title')
                     ->pluck('title', 'id'))
                 ->searchable()
-                ->preload()
                 ->visible(fn (Get $get) => $get('link_existing'))
                 ->nullable(),
             Forms\Components\TextInput::make('existing_document_id_alt')
