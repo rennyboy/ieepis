@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use App\Enums\EmployeeStatus;
 
 class Employee extends Model
 {
@@ -53,6 +54,7 @@ class Employee extends Model
         "is_oic" => "boolean",
         "is_non_deped_funded" => "boolean",
         "is_inactive" => "boolean",
+        "status" => EmployeeStatus::class,
     ];
 
     public function getActivitylogOptions(): LogOptions

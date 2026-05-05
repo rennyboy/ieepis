@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use App\Enums\AccountabilityStatus;
+use App\Enums\EquipmentCondition;
+use App\Enums\TransactionType;
 
 class Equipment extends Model
 {
@@ -72,6 +75,9 @@ class Equipment extends Model
         "is_non_dcp" => "boolean",
         "under_warranty" => "boolean",
         "is_functional" => "boolean",
+        "accountability_status" => AccountabilityStatus::class,
+        "condition" => EquipmentCondition::class,
+        "transaction_type" => TransactionType::class,
     ];
 
     public function getActivitylogOptions(): LogOptions

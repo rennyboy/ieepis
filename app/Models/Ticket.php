@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use App\Enums\TicketStatus;
+use App\Enums\TicketPriority;
 
 class Ticket extends Model
 {
@@ -35,6 +37,8 @@ class Ticket extends Model
     protected $casts = [
         "resolved_at" => "datetime",
         "closed_at" => "datetime",
+        "status" => TicketStatus::class,
+        "priority" => TicketPriority::class,
     ];
 
     public function getActivitylogOptions(): LogOptions

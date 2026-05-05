@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
+use App\Enums\TransactionType;
 
 /**
  * EquipmentAssignment Model
@@ -60,6 +61,7 @@ class EquipmentAssignment extends Model
         'assigned_at' => 'date',
         'custodian_received_at' => 'date',
         'returned_at' => 'date',
+        'transaction_type' => TransactionType::class,
     ];
 
     protected static function booted(): void

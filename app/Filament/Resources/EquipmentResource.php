@@ -3,6 +3,9 @@
 namespace App\Filament\Resources;
 
 use App\Enums\DocumentType;
+use App\Enums\AccountabilityStatus;
+use App\Enums\EquipmentCondition;
+use App\Enums\TransactionType;
 use App\Filament\Resources\EquipmentResource\Pages;
 use App\Filament\Resources\EquipmentResource\RelationManagers;
 use App\Exports\EquipmentExport;
@@ -278,27 +281,13 @@ class EquipmentResource extends Resource
                                 ->label('Functional')
                                 ->default(true),
                             Forms\Components\Select::make('condition')
-                                ->options([
-                                    'Good' => 'Good',
-                                    'Fair' => 'Fair',
-                                    'Poor' => 'Poor',
-                                    'Unserviceable' => 'Unserviceable',
-                                ])
+                                ->options(EquipmentCondition::options())
                                 ->required(),
                             Forms\Components\Select::make(
                                 'accountability_status',
                             )
                                 ->label('Accountability / Disposition Status')
-                                ->options([
-                                    'Normal' => 'Normal',
-                                    'assigned' => 'Assigned',
-                                    'unassigned' => 'Unassigned',
-                                    'Transferred' => 'Transferred',
-                                    'Stolen' => 'Stolen',
-                                    'Lost' => 'Lost',
-                                    'Damaged' => 'Damaged due to calamity',
-                                    'For Disposal' => 'For Disposal',
-                                ])
+                                ->options(AccountabilityStatus::options())
                                 ->required(),
                             Forms\Components\Select::make(
                                 'equipment_condition_coa',
@@ -415,16 +404,8 @@ class EquipmentResource extends Resource
                 Tables\Columns\TextColumn::make('accountability_status')
                     ->label('Status')
                     ->badge()
-                    ->colors([
-                        'success' => 'Normal',
-                        'info' => 'assigned',
-                        'warning' => 'unassigned',
-                        'danger' => fn ($state) => in_array($state, [
-                            'Stolen',
-                            'Lost',
-                            'For Disposal',
-                        ]),
-                    ]),
+                    ->formatStateUsing(fn (AccountabilityStatus $state): string => $state->label())
+                    ->color(fn (AccountabilityStatus $state): string => $state->color()),
                 Tables\Columns\TextColumn::make('document.title')
                     ->label('Linked Doc')
                     ->limit(25)
@@ -467,18 +448,8 @@ class EquipmentResource extends Resource
                 ),
                 Tables\Filters\SelectFilter::make(
                     'accountability_status',
-                )->options([
-                    'Normal' => 'Normal',
-                    'assigned' => 'Assigned',
-                    'unassigned' => 'Unassigned',
-                    'For Disposal' => 'For Disposal',
-                ]),
-                Tables\Filters\SelectFilter::make('condition')->options([
-                    'Good' => 'Good',
-                    'Fair' => 'Fair',
-                    'Poor' => 'Poor',
-                    'Unserviceable' => 'Unserviceable',
-                ]),
+                )->options(AccountabilityStatus::options()),
+                Tables\Filters\SelectFilter::make('condition')->options(EquipmentCondition::options()),
                 Tables\Filters\TernaryFilter::make('is_dcp')->label('DCP Only'),
                 Tables\Filters\TernaryFilter::make('is_functional')->label(
                     'Functional Only',
@@ -623,12 +594,16 @@ class EquipmentResource extends Resource
                                 ->boolean(),
                             Infolists\Components\TextEntry::make(
                                 'condition',
-                            )->badge(),
+                            )->badge()
+                                ->formatStateUsing(fn (EquipmentCondition $state): string => $state->label())
+                                ->color(fn (EquipmentCondition $state): string => $state->color()),
                             Infolists\Components\TextEntry::make(
                                 'accountability_status',
                             )
                                 ->label('Status')
-                                ->badge(),
+                                ->badge()
+                                ->formatStateUsing(fn (AccountabilityStatus $state): string => $state->label())
+                                ->color(fn (AccountabilityStatus $state): string => $state->color()),
                             Infolists\Components\TextEntry::make(
                                 'equipment_location',
                             )->label('Location'),

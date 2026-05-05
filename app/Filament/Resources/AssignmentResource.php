@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\TransactionType;
 use App\Filament\Resources\AssignmentResource\Pages;
 use App\Models\Equipment;
 use App\Models\EquipmentAssignment;
@@ -77,14 +78,9 @@ class AssignmentResource extends Resource
                         ->searchable()
                         ->nullable(),
                     Forms\Components\Select::make('transaction_type')
-                        ->options([
-                            'Beginning Inventory' => 'Beginning Inventory',
-                            'Issuance' => 'Issuance',
-                            'Transfer' => 'Transfer',
-                            'Return' => 'Return',
-                        ])
+                        ->options(TransactionType::options())
                         ->required()
-                        ->default('Issuance'),
+                        ->default(TransactionType::Issuance),
                     Forms\Components\Select::make('supporting_doc_type')
                         ->label('Supporting Document Type')
                         ->options([
@@ -134,7 +130,8 @@ class AssignmentResource extends Resource
                 Tables\Columns\TextColumn::make('transaction_type')
                     ->label('Transaction')
                     ->badge()
-                    ->color('info'),
+                    ->formatStateUsing(fn (TransactionType $state): string => $state->label())
+                    ->color(fn (TransactionType $state): string => $state->color()),
                 Tables\Columns\TextColumn::make('supporting_doc_type')
                     ->label('Doc Type')
                     ->badge()
@@ -158,12 +155,7 @@ class AssignmentResource extends Resource
                     ->label('Active Only')
                     ->query(fn ($query) => $query->whereNull('returned_at'))
                     ->default(),
-                Tables\Filters\SelectFilter::make('transaction_type')->options([
-                    'Beginning Inventory' => 'Beginning Inventory',
-                    'Issuance' => 'Issuance',
-                    'Transfer' => 'Transfer',
-                    'Return' => 'Return',
-                ]),
+                Tables\Filters\SelectFilter::make('transaction_type')->options(TransactionType::options()),
                 Tables\Filters\SelectFilter::make('school_id')
                     ->label('School')
                     ->relationship('school', 'name')
