@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\EmployeeStatus;
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Filament\Resources\EmployeeResource\RelationManagers;
 use App\Models\Employee;
@@ -94,13 +95,9 @@ class EmployeeResource extends Resource
                         ])
                         ->required(),
                     Forms\Components\Select::make('status')
-                        ->options([
-                            'active' => 'Active',
-                            'inactive' => 'Inactive',
-                            'retired' => 'Retired',
-                        ])
+                        ->options(EmployeeStatus::options())
                         ->required()
-                        ->default('active'),
+                        ->default(EmployeeStatus::Active),
                     Forms\Components\DatePicker::make('date_hired')->label(
                         'Date Hired',
                     ),
@@ -211,11 +208,8 @@ class EmployeeResource extends Resource
                     ->counts('activeAssignments'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->colors([
-                        'success' => 'active',
-                        'danger' => 'inactive',
-                        'gray' => 'retired',
-                    ]),
+                    ->formatStateUsing(fn (EmployeeStatus $state): string => $state->label())
+                    ->color(fn (EmployeeStatus $state): string => $state->color()),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('school')
@@ -226,11 +220,7 @@ class EmployeeResource extends Resource
                     'teaching' => 'Teaching',
                     'non-teaching' => 'Non-Teaching',
                 ]),
-                Tables\Filters\SelectFilter::make('status')->options([
-                    'active' => 'Active',
-                    'inactive' => 'Inactive',
-                    'retired' => 'Retired',
-                ]),
+                Tables\Filters\SelectFilter::make('status')->options(EmployeeStatus::options()),
             ])
             ->heading(new \Illuminate\Support\HtmlString(view('filament.components.export-button', [
                 'route' => 'employees.pdf.bulk',
@@ -328,7 +318,10 @@ class EmployeeResource extends Resource
                     Infolists\Components\TextEntry::make(
                         'employment_type',
                     )->badge(),
-                    Infolists\Components\TextEntry::make('status')->badge(),
+                    Infolists\Components\TextEntry::make('status')
+                        ->badge()
+                        ->formatStateUsing(fn (EmployeeStatus $state): string => $state->label())
+                        ->color(fn (EmployeeStatus $state): string => $state->color()),
                     Infolists\Components\TextEntry::make('email'),
                     Infolists\Components\TextEntry::make('mobile_1'),
                     Infolists\Components\TextEntry::make('date_hired')->date(),

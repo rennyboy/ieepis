@@ -10,6 +10,8 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use App\Enums\TicketStatus;
+use App\Enums\TicketPriority;
 
 class TicketResource extends Resource
 {
@@ -85,24 +87,13 @@ class TicketResource extends Resource
             Forms\Components\Section::make('Status & Assignment')
                 ->schema([
                     Forms\Components\Select::make('priority')
-                        ->options([
-                            'low' => 'Low',
-                            'medium' => 'Medium',
-                            'high' => 'High',
-                            'critical' => 'Critical',
-                        ])
+                        ->options(TicketPriority::options())
                         ->required()
-                        ->default('medium'),
+                        ->default(TicketPriority::Medium),
                     Forms\Components\Select::make('status')
-                        ->options([
-                            'open' => 'Open',
-                            'in-progress' => 'In Progress',
-                            'pending' => 'Pending',
-                            'resolved' => 'Resolved',
-                            'closed' => 'Closed',
-                        ])
+                        ->options(TicketStatus::options())
                         ->required()
-                        ->default('open'),
+                        ->default(TicketStatus::Open),
                     Forms\Components\Select::make('assigned_to_id')
                         ->label('Assigned Technician')
                         ->relationship('assignedTo', 'full_name')
@@ -143,25 +134,12 @@ class TicketResource extends Resource
                 ),
                 Tables\Columns\TextColumn::make('priority')
                     ->badge()
-                    ->colors([
-                        'success' => 'low',
-                        'warning' => 'medium',
-                        'danger' => fn ($state) => in_array($state, [
-                            'high',
-                            'critical',
-                        ]),
-                    ]),
+                    ->formatStateUsing(fn (TicketPriority $state): string => $state->label())
+                    ->color(fn (TicketPriority $state): string => $state->color()),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->colors([
-                        'warning' => 'open',
-                        'primary' => 'in-progress',
-                        'gray' => 'pending',
-                        'success' => fn ($state) => in_array($state, [
-                            'resolved',
-                            'closed',
-                        ]),
-                    ]),
+                    ->formatStateUsing(fn (TicketStatus $state): string => $state->label())
+                    ->color(fn (TicketStatus $state): string => $state->color()),
                 Tables\Columns\TextColumn::make('assignedTo.full_name')->label(
                     'Assigned To',
                 ),
@@ -174,18 +152,8 @@ class TicketResource extends Resource
                     ->date(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('status')->options([
-                    'open' => 'Open',
-                    'in-progress' => 'In Progress',
-                    'pending' => 'Pending',
-                    'resolved' => 'Resolved',
-                ]),
-                Tables\Filters\SelectFilter::make('priority')->options([
-                    'low' => 'Low',
-                    'medium' => 'Medium',
-                    'high' => 'High',
-                    'critical' => 'Critical',
-                ]),
+                Tables\Filters\SelectFilter::make('status')->options(TicketStatus::options()),
+                Tables\Filters\SelectFilter::make('priority')->options(TicketPriority::options()),
                 Tables\Filters\SelectFilter::make('school')
                     ->relationship('school', 'name')
                     ->searchable()

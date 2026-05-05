@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Enums\EquipmentCondition;
+use App\Enums\AccountabilityStatus;
 
 class OfflineEquipmentController extends Controller
 {
@@ -132,8 +134,9 @@ class OfflineEquipmentController extends Controller
             'brand' => ['nullable', 'string', 'max:255'],
             'model' => ['nullable', 'string', 'max:255'],
             'specifications' => ['nullable', 'string'],
-            'category' => ['nullable', Rule::in(['High-Value', 'Low-Value'])],
-            'condition' => ['nullable', Rule::in(['Good', 'Fair', 'Poor', 'Unserviceable'])],
+            'category' => ['nullable', 'string', 'max:255'],
+            'condition' => ['nullable', Rule::enum(EquipmentCondition::class)],
+            'accountability_status' => ['nullable', Rule::enum(AccountabilityStatus::class)],
             'equipment_location' => ['nullable', 'string', 'max:255'],
             'remarks' => ['nullable', 'string'],
         ])->validate();

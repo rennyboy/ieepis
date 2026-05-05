@@ -9,7 +9,8 @@
 - [ ] Bulk QR code export (per school/room sheets)
 - [ ] PAR/ICS PDF generation (printable accountability forms)
 - [ ] Warranty expiry notification (<90 days, email)
-- [ ] Equipment import via Excel template
+- [x] Equipment import via Excel template
+- [ ] Refactor `DcpDistributionData.php` to move aggregations to SQL (High Priority)
 
 ## This Week (P2)
 - [ ] Maintenance log (repairs/service history per equipment) — wire `MaintenanceLog` stub model
