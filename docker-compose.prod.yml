@@ -3,7 +3,6 @@
 # Run:    docker compose -f docker-compose.prod.yml up -d
 # Tail:   docker compose -f docker-compose.prod.yml logs -f app
 
-# Shared environment for all PHP services (app/worker/scheduler)
 x-app-env: &app-env
   APP_NAME: ${APP_NAME:-IEEPIS}
   APP_ENV: production
@@ -23,25 +22,31 @@ x-app-env: &app-env
   REDIS_PORT: 6379
   SESSION_DRIVER: redis
   SESSION_LIFETIME: ${SESSION_LIFETIME:-120}
+  SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-true}
+  SESSION_SAME_SITE: ${SESSION_SAME_SITE:-lax}
   QUEUE_CONNECTION: redis
   FILESYSTEM_DISK: ${FILESYSTEM_DISK:-public}
   MAIL_MAILER: ${MAIL_MAILER:-log}
   BROADCAST_DRIVER: ${BROADCAST_DRIVER:-log}
 
-# Shared build target for the PHP image (app stage)
 x-app-build: &app-build
   build:
     context: .
     dockerfile: Dockerfile
     target: app
 
-# Shared volume mounts for any container that runs Laravel code
 x-app-volumes: &app-volumes
   - app-storage:/var/www/storage
   - app-bootstrap-cache:/var/www/bootstrap/cache
 
+# json-file driver with rotation — keeps each container's logs bounded.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
-  # Nginx — serves static assets and proxies PHP to the app container
   nginx:
     build:
       context: .
@@ -53,7 +58,6 @@ services:
     ports:
       - "${NGINX_PORT:-8080}:80"
     volumes:
-      # Read-only mount so /storage/* requests can resolve via the baked-in symlink
       - app-storage:/var/www/storage:ro
     networks:
       - ieepis-network
@@ -66,14 +70,19 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: ${NGINX_MEM_LIMIT:-128M}
 
-  # PHP-FPM application
   app:
     <<: *app-build
     image: ieepis/app:latest
     container_name: ieepis-app
     restart: unless-stopped
     working_dir: /var/www
+    init: true
     environment:
       <<: *app-env
     volumes: *app-volumes
@@ -90,14 +99,19 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: ${APP_MEM_LIMIT:-768M}
 
-  # Queue worker — reuses the same image as app
   worker:
     image: ieepis/app:latest
     container_name: ieepis-worker
     restart: unless-stopped
     working_dir: /var/www
-    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600 --max-jobs=1000
+    init: true
+    command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600 --max-jobs=1000 --backoff=10
     environment:
       <<: *app-env
       CONTAINER_ROLE: worker
@@ -112,13 +126,18 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: ${WORKER_MEM_LIMIT:-512M}
 
-  # Scheduler — runs the Laravel scheduler every minute
   scheduler:
     image: ieepis/app:latest
     container_name: ieepis-scheduler
     restart: unless-stopped
     working_dir: /var/www
+    init: true
     command: sh -c "while true; do php artisan schedule:run --no-interaction --verbose --no-ansi; sleep 60; done"
     environment:
       <<: *app-env
@@ -129,8 +148,12 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: ${SCHEDULER_MEM_LIMIT:-256M}
 
-  # PostgreSQL — internal only, no host port exposure in production
   db:
     image: postgres:16-alpine
     container_name: ieepis-db
@@ -150,8 +173,12 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: ${DB_MEM_LIMIT:-1G}
 
-  # Redis — cache, session, queue
   redis:
     image: redis:7-alpine
     container_name: ieepis-redis
@@ -170,6 +197,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: ${REDIS_MEM_LIMIT:-320M}
 
 networks:
   ieepis-network:

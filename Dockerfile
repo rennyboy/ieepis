@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq-dev \
         postgresql-client \
         libfcgi-bin \
+        procps \
     && docker-php-ext-configure intl \
     && docker-php-ext-install pdo_pgsql mbstring exif pcntl bcmath gd zip intl \
     && pecl install redis \
