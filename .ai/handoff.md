@@ -2,26 +2,33 @@
 
 ## Last Updated
 
-2026-05-05
+2026-05-06
 
 ## What Was Completed
 
-- **Enum Refactoring**: Transitioned critical domain concepts (AccountabilityStatus, TransactionType, EquipmentCondition, EmployeeStatus, TicketStatus/Priority) from hardcoded strings to **PHP 8.1 Backed Enums**.
-- **Production Stack Overhaul**: Migrated from "fat container" to decoupled architecture with separate **Nginx, PHP-FPM, Worker, and Scheduler** services.
-- **Infrastructure Standardization**: Switched production DB to **PostgreSQL 16** (matching Sail) and optimized Nginx with browser caching/Gzip.
-- **Critical Fix**: Resolved production boot failure by ensuring `laravel/boost` is present in main requirements and synced `composer.lock`.
+- **QR Scanner Unauthorized Fix**: Resolved "Unauthorized" error when scanning QR codes.
+  - Found two QR scanner implementations: Livewire QrScanner and Vue OfflineScanner
+  - **Root Cause**: The actual scanner used (OfflineScanner.vue) posts to `/scanner/resolve` endpoint without authentication
+  - **Fix 1**: Added `auth` middleware to `OfflineSyncController.__construct()`
+  - **Fix 2**: Configured axios to send credentials (cookies) with `axios.defaults.withCredentials = true` in OfflineScanner.vue
+  - **Fix 3**: Added CSRF token configuration for axios requests
+  - **Fix 4**: Updated QrScannerPage.php permission check to explicitly allow super-admin
+  - **Fix 5**: Updated QrScanner.php Livewire redirect to use `$this->redirect()` method
+  - Rebuilt frontend assets with `npm run build`
+  - Cleared all Laravel caches
 
 ## Current Blockers
 
-- **Functional Testing**: Manual verification of the new Enum-driven forms/tables on a physical device.
+- **Functional Testing**: Manual verification of QR scanner fix on a physical device with super-admin credentials.
 
 ## Immediate Next Actions
 
-- **M6** (next): Refactor `app/Filament/Pages/DcpDistributionData.php` to move heavy aggregations from PHP to SQL queries.
+- **Test QR Scanner**: Scan a QR code with super-admin account and verify redirect works without "Unauthorized" error
+- **M6**: Refactor `app/Filament/Pages/DcpDistributionData.php` to move heavy aggregations from PHP to SQL queries.
 - **M5**: Expand PHPUnit coverage for Enum-casted models and the new production stack.
-- **M1**: Audit remaining Resources for any missed string-to-enum opportunities (e.g., `DocumentType`).
 
 ## Notes for Next Session
 
 - **Prod Build**: Use `docker compose -f docker-compose.prod.yml up -d --build` to verify the latest dependency fixes.
+- **QR Scanner Testing**: Test the scanner at `/admin/qr-scanner-page` with both super-admin and school-admin accounts.
 - **Consistency**: Maintain Postgres-first conventions now that Prod and Sail are aligned.

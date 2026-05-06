@@ -20,7 +20,15 @@ class QrScannerPage extends Page
     // Permission
     protected static function canView(): bool
     {
-        return auth()->user()?->can('scan qr');
+        $user = auth()->user();
+        
+        // Super admin can always view (explicit check to avoid gate issues)
+        if ($user && $user->hasRole('super-admin')) {
+            return true;
+        }
+        
+        // Check for scan qr permission for other roles
+        return $user?->can('scan qr') ?? false;
     }
 
     public function getTitle(): string
