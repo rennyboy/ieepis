@@ -10,6 +10,7 @@ export default defineConfig({
         "resources/css/filament/admin/custom.css",
         "resources/js/app.js",
         "resources/js/scanner.js",
+        "resources/js/livewire-scanner.js",
         "resources/js/equipment.js",
       ],
       refresh: true,

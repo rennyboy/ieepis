@@ -193,24 +193,67 @@ const syncOfflineScans = async () => {
 };
 
 // Camera Logic
+const isInAppBrowser = () => /(FBAN|FBAV|FB_IAB|Instagram|Line|MicroMessenger|Twitter|TikTok)/i.test(navigator.userAgent || '');
+
+const cameraPreflight = () => {
+  if (!window.isSecureContext) {
+    return 'Camera requires HTTPS. This page is being served over an insecure (http://) connection — mobile browsers block the camera unless the URL starts with https://.';
+  }
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+    if (isInAppBrowser()) {
+      return 'Camera streaming is blocked inside this in-app browser (Facebook / Instagram / Line / etc.). Tap the menu and choose "Open in Chrome" or "Open in Safari".';
+    }
+    return 'Camera streaming is not supported in this browser. Update Chrome / Safari, or open the site in a different browser.';
+  }
+  return null;
+};
+
+const friendlyCameraError = (err) => {
+  const name = err?.name || '';
+  const msg = err?.message || (typeof err === 'string' ? err : '');
+
+  if (name === 'NotAllowedError' || /denied|permission/i.test(msg)) {
+    return 'Camera permission was denied. Open browser settings and allow camera access for this site, then try again.';
+  }
+  if (name === 'NotFoundError' || /not.*found|no.*camera/i.test(msg)) {
+    return 'No camera was found on this device.';
+  }
+  if (name === 'NotReadableError' || /in use|busy/i.test(msg)) {
+    return 'Camera is already in use by another app. Close apps using the camera and try again.';
+  }
+  if (name === 'OverconstrainedError') {
+    return 'No camera matches the requested settings. Use the manual entry below.';
+  }
+  if (/secure|https/i.test(msg)) {
+    return 'Camera requires a secure (https://) connection.';
+  }
+  return msg || 'Unknown camera error. Use the manual entry below.';
+};
+
 const startScanning = () => {
-  scanning.value = true;
   message.value = { text: '', type: '' };
-  
+
+  const failure = cameraPreflight();
+  if (failure) {
+    showMessage(failure, 'error', 0);
+    return;
+  }
+
+  scanning.value = true;
+
   // Need to wait for next tick for the DOM element to be visible
   setTimeout(() => {
     html5QrCode = new Html5Qrcode('qr-reader-vue');
-    
+
     html5QrCode.start(
-      { facingMode: 'environment' }, 
-      { fps: 10, qrbox: 250 }, 
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: 250 },
       (decodedText) => {
         processScannedCode(decodedText);
-      }
+      },
     ).catch(err => {
-      console.error(err);
-      const errorMsg = typeof err === 'string' ? err : (err?.message || 'Check camera permissions. iOS requires HTTPS.');
-      showMessage('Camera error: ' + errorMsg);
+      console.error('Camera start failed:', err);
+      showMessage(friendlyCameraError(err), 'error', 0);
       stopScanning();
     });
   }, 100);

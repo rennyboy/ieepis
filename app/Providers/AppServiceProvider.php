@@ -8,13 +8,19 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Force HTTPS URL generation when APP_URL is https, so asset() / route() / url()
+        // produce https URLs even when the request scheme appears as http inside the proxy chain.
+        // Must run in register() — Filament's PanelProvider captures asset() URLs during boot().
+        if (str_starts_with((string) config('app.url'), 'https://')) {
+            URL::forceScheme('https');
+        }
     }
 
     public function boot(): void
@@ -23,7 +29,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureRateLimiters();
 
-        Model::preventLazyLoading(! $this->app->isProduction());
+        Model::preventLazyLoading(! app()->environment('production'));
     }
 
     private function configureRateLimiters(): void
