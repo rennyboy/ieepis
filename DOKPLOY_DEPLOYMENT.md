@@ -1,165 +1,201 @@
 # Dokploy Deployment Guide for IEEPIS
 
-This guide provides a step-by-step process for deploying the IEEPIS (Laravel 11, PHP 8.4, Filament v3, PostgreSQL) application to an Ubuntu server using [Dokploy](https://dokploy.com/), a free and open-source PaaS alternative to Laravel Forge or Vercel.
+This guide deploys IEEPIS (Laravel 12, PHP 8.4, Filament v3, PostgreSQL 16, Redis 7) to a self-hosted Ubuntu server using [Dokploy](https://dokploy.com/) — a free, open-source PaaS alternative to Forge/Vercel.
 
-Since you are currently on MX Linux (Debian-based), you can run all SSH commands directly from your local terminal.
+The repository ships with a **production-ready `docker-compose.prod.yml`** that defines the full stack: nginx + PHP-FPM + queue worker + scheduler + PostgreSQL + Redis. Dokploy's Docker Compose application type uses this file directly, so you do **not** need Nixpacks or Buildpacks.
+
+---
 
 ## Prerequisites
 
-1. **A VPS or Dedicated Server** running **Ubuntu 24.04** or **22.04 LTS**.
-2. **A Domain Name** pointing to your server's IP address (e.g., `ieepis.yourdomain.com`).
-3. **SSH Access** to your Ubuntu server as the `root` user.
-4. Your application code pushed to a Git repository (GitHub, GitLab, or Bitbucket).
+1. **VPS / dedicated server** running **Ubuntu 22.04 / 24.04 LTS** (≥ 2 GB RAM, 2 vCPU recommended).
+2. **Domain name** with an A record pointing to the server (e.g. `ieepis.yourdomain.com`).
+3. **SSH access** as `root` or a sudo-enabled user.
+4. The IEEPIS repo on GitHub / GitLab / Gitea / Bitbucket.
 
 ---
 
-## Step 1: Install Dokploy on your Ubuntu Server
+## Step 1 — Install Dokploy
 
-Dokploy installs Docker, Traefik (for routing/SSL), and its own control panel automatically.
+SSH into the server and run the official installer (it provisions Docker, Traefik with automatic Let's Encrypt SSL, and the Dokploy control panel):
 
-1. Open your MX Linux terminal and SSH into your server:
-   ```bash
-   ssh root@your_server_ip
-   ```
-
-2. Run the official Dokploy installation script:
-   ```bash
-   curl -sSL https://dokploy.com/install.sh | sh
-   ```
-
-3. Wait for the installation to finish (it may take 5-10 minutes).
-4. Once completed, the terminal will provide a URL to access the Dokploy dashboard (usually `http://your_server_ip:3000`).
-5. Open that URL in your browser and create your Admin account.
-
----
-
-## Step 2: Configure PostgreSQL Database in Dokploy
-
-Before deploying the Laravel app, we need the database running.
-
-1. In the Dokploy Dashboard, go to your **Project** (create one if necessary, e.g., "IEEPIS").
-2. Click **Create Service** and choose **PostgreSQL**.
-3. Fill in the details:
-   - **Name**: `ieepis-db`
-   - **Database Name**: `ieepis`
-   - **User**: `postgres` (or custom)
-   - **Password**: *Generate a secure password*
-   - **Version**: `14` or later
-4. Click **Deploy**.
-5. Once deployed, note down the internal connection details provided by Dokploy (you will need these for the Laravel `.env` file). The internal host will   usually just be the service name, e.g., `ieepis-db`.
-
----
-
-## Step 3: Deploy the Laravel Application
-
-Now we deploy the actual IEEPIS codebase.
-
-1. In your Dokploy Project, click **Create Service** and choose **Application**.
-2. Set the **Name** to `ieepis-app`.
-3. Under the **Source** tab:
-   - Connect your Git provider (GitHub/GitLab).
-   - Select your IEEPIS repository and branch (e.g., `main`).
-4. Under the **Build** tab, select **Nixpacks** (Dokploy's default builder, which automatically detects Laravel and PHP).
-5. Under the **Environment** tab, copy your local `.env` variables and paste them. Update the database credentials to match the PostgreSQL service you just created:
-   ```env
-   APP_ENV=production
-   APP_DEBUG=false
-   APP_URL=https://ieepis.yourdomain.com
-
-   DB_CONNECTION=pgsql
-   DB_HOST=ieepis-db
-   DB_PORT=5432
-   DB_DATABASE=ieepis
-   DB_USERNAME=postgres
-   DB_PASSWORD=your_secure_password
-   ```
-   *(Ensure `APP_KEY` is also set here).*
-
-6. Under the **Domains** tab:
-   - Add your domain (`ieepis.yourdomain.com`).
-   - Enable **Let's Encrypt** to automatically generate a free SSL certificate.
-
----
-
-## Step 4: Add Pre/Post Deployment Scripts
-
-Since Laravel requires specific commands to run during deployment (like migrating the database and caching config), we need to instruct Dokploy to run them.
-
-In your Application settings under **Deploy > Commands**, you can set the run command. Nixpacks usually handles `composer install` and `npm run build` automatically.
-
-However, to ensure migrations run, you should update the **Start Command** (or add a custom Nixpacks configuration file `nixpacks.toml` to your repo).
-
-Alternatively, you can add a post-deploy script in Dokploy:
 ```bash
-php artisan migrate --force
-php artisan optimize:clear
-php artisan optimize
-php artisan filament:cache-components
+ssh root@your_server_ip
+curl -sSL https://dokploy.com/install.sh | sh
 ```
 
----
-
-## Step 5: Start the Deployment
-
-1. Click the **Deploy** button on your `ieepis-app` service.
-2. Monitor the build logs. Dokploy will pull the code, install PHP extensions, run `composer install`, run `npm run build`, and start the Octane/FPM server.
-3. If the build fails because of a missing PHP extension, you may need to add a `nixpacks.toml` file to the root of your MX Linux project and push it:
-
-   **Example `nixpacks.toml`:**
-   ```toml
-   [phases.setup]
-   nixPkgs = ['php84', 'php84Packages.composer']
-
-   [phases.build]
-   cmds = [
-       'composer install --no-dev --optimize-autoloader',
-       'npm ci',
-       'npm run build'
-   ]
-
-   [start]
-   cmd = 'php artisan serve --host=0.0.0.0 --port=$PORT'
-   ```
-   *(Note: Dokploy usually detects this fine, but this file forces specific behavior).*
+When the script finishes, open `http://your_server_ip:3000` and create the admin account.
 
 ---
 
-## Step 6: Create Storage Link & Admin User
+## Step 2 — Create the Project and a Compose Application
 
-Once the app is running successfully:
+1. In Dokploy, click **Create Project** → name it **IEEPIS**.
+2. Inside the project click **Create Service** → **Application** → **Docker Compose**.
+3. **Source tab**:
+   - Provider: GitHub / GitLab / Git
+   - Repository: your IEEPIS repo
+   - Branch: `main` (or `feature-core` while developing)
+   - **Compose file path**: `docker-compose.prod.yml`
+4. **Build tab**: leave the default. Dokploy will run `docker compose -f docker-compose.prod.yml build` against the repo.
 
-1. Open the **Terminal** tab inside your `ieepis-app` service in Dokploy.
-2. Run the storage link command:
-   ```bash
-   php artisan storage:link
-   ```
-3. Run any initial seeders or create your first super-admin:
-   ```bash
-   php artisan db:seed
-   # OR
-   php artisan make:filament-user
-   ```
+> The compose file builds two images from the same `Dockerfile` via separate targets: `app` (php-fpm + composer deps + assets) and `web` (nginx serving the baked-in `public/` directory).
 
 ---
 
-## Step 7: Queue Workers and Cron Jobs (Optional but Recommended)
+## Step 3 — Configure environment variables
 
-If IEEPIS uses queued jobs or scheduled tasks (e.g., for sending emails or checking maintenance schedules):
+Under the **Environment** tab of the Compose service, paste the production env. Adjust values to match your secrets:
 
-### 1. Cron / Scheduler
-In the Dokploy dashboard for your application, find the **Cron Jobs** or **Advanced** tab and add:
-- **Command**: `php artisan schedule:run`
-- **Schedule**: `* * * * *` (Every minute)
+```env
+# App
+APP_NAME=IEEPIS
+APP_KEY=base64:GENERATE_WITH_php_artisan_key_generate
+APP_URL=https://ieepis.yourdomain.com
+LOG_CHANNEL=stderr
+LOG_LEVEL=warning
 
-### 2. Queue Worker
-To run the queue worker continuously, you can either:
-- Set up a separate **Application Service** in Dokploy pointing to the same repo, but change the **Start Command** to `php artisan queue:work --tries=3`.
-- OR use Laravel Horizon if you have Redis installed.
+# Database (matches the `db` service inside the compose network)
+DB_DATABASE=ieepis_db
+DB_USERNAME=ieepis_user
+DB_PASSWORD=replace_with_a_long_random_password
+
+# Sessions / mail / filesystem
+SESSION_LIFETIME=120
+FILESYSTEM_DISK=public
+MAIL_MAILER=smtp           # or "log" while smoke-testing
+MAIL_HOST=
+MAIL_PORT=587
+MAIL_USERNAME=
+MAIL_PASSWORD=
+MAIL_FROM_ADDRESS=no-reply@yourdomain.com
+MAIL_FROM_NAME="${APP_NAME}"
+
+# Optional tuning
+NGINX_PORT=80              # internal — Traefik handles 443
+REDIS_MAXMEMORY=256mb
+```
+
+Generate `APP_KEY` locally with `php artisan key:generate --show` and paste the value (including the `base64:` prefix).
+
+---
+
+## Step 4 — Wire up the domain and SSL
+
+1. Open the **Domains** tab on the `nginx` service inside the compose stack.
+2. Add `ieepis.yourdomain.com`.
+3. Set the container port to **80** (the port `nginx` listens on inside the network).
+4. Enable **HTTPS** + **Let's Encrypt**. Dokploy's Traefik will provision the certificate and redirect HTTP → HTTPS automatically.
+
+> The compose file also exposes `${NGINX_PORT:-8080}:80` for direct host access; you can remove that mapping in production if you only want Traefik to reach nginx via the internal network.
+
+---
+
+## Step 5 — Deploy
+
+Hit **Deploy**. Dokploy will:
+
+1. Clone the repo.
+2. Run `docker compose build` (Node stage compiles Vite assets, PHP stage installs Composer deps and bakes the source).
+3. Start the six services (`nginx`, `app`, `worker`, `scheduler`, `db`, `redis`).
+4. The `app` container runs `docker/entrypoint.sh`, which:
+   - waits for PostgreSQL,
+   - runs `php artisan migrate --force` (fails the deploy if migrations error),
+   - refreshes the storage symlink,
+   - rebuilds `config:cache`, `route:cache`, `view:cache`.
+
+Tail the logs from the Dokploy UI (or `docker compose -f docker-compose.prod.yml logs -f app` on the server) to confirm a clean boot.
+
+---
+
+## Step 6 — First-time bootstrap
+
+Open the **Terminal** tab for the `app` service and run:
+
+```bash
+# Seed the database (only if you have seeders for production data)
+php artisan db:seed --force
+
+# Create the first super-admin
+php artisan make:filament-user
+```
+
+Storage and Filament caches are already handled by the entrypoint, so nothing else is required.
+
+---
+
+## Step 7 — Verify the stack
+
+| Check | How |
+| --- | --- |
+| App responds | `curl -fsS https://ieepis.yourdomain.com/up` returns `OK` |
+| Migrations applied | `php artisan migrate:status` inside the `app` container |
+| Worker is running | `docker compose -f docker-compose.prod.yml ps worker` shows `(healthy)` |
+| Scheduler is running | `docker compose logs scheduler` prints `Running scheduled command` lines every minute |
+| Redis | `docker compose exec redis redis-cli ping` → `PONG` |
+| Postgres | `docker compose exec db pg_isready` → `accepting connections` |
+
+---
+
+## Pushing local changes to production
+
+Because the production stack is built from your Git repo, the cycle is:
+
+| Change | Action |
+| --- | --- |
+| PHP / Blade / Filament code | `git push` → Dokploy redeploys → `app`, `worker`, `scheduler` rebuild from the new `app` target |
+| `composer.json` / `composer.lock` | Same as above; the composer install layer is invalidated by the lockfile change |
+| Front-end (`resources/`, JS, CSS) | Same as above; the Node `assets` stage re-runs `npm run build` |
+| `Dockerfile` | Push, then trigger **Rebuild** in Dokploy (use **Force rebuild** to invalidate cache) |
+| `docker-compose.prod.yml` | Push, then **Redeploy**; only changed services restart |
+| `.env` only | Edit in Dokploy → **Restart** (no rebuild required) |
+| Database migration | Push the migration; the entrypoint runs `migrate --force` automatically on the next boot |
+| nginx config (`docker/nginx/prod.conf`) | Push, then **Redeploy** (it's baked into the `web` image) |
+
+Local development does **not** use this Compose stack — run `php artisan serve` and `npm run dev` directly per the project's Decision 014.
+
+---
+
+## Step 8 — Backups
+
+### Database
+
+Dokploy's **Backups** tab on the `db` service supports scheduled `pg_dump` to S3-compatible storage. Recommended cadence: daily, retain 14 days.
+
+Manual snapshot:
+
+```bash
+docker compose -f docker-compose.prod.yml exec db \
+  pg_dump -U "$DB_USERNAME" "$DB_DATABASE" | gzip > ieepis-$(date +%F).sql.gz
+```
+
+### Uploaded files
+
+The `app-storage` named volume holds everything under `storage/`. Back it up with:
+
+```bash
+docker run --rm -v ieepis_app-storage:/data -v "$PWD":/backup alpine \
+  tar czf /backup/storage-$(date +%F).tgz -C /data .
+```
 
 ---
 
 ## Troubleshooting
 
-- **500 Error after deploy**: Check the **Logs** tab in Dokploy. It's usually a missing `.env` variable or un-migrated database.
-- **Assets (CSS/JS) not loading**: Ensure `APP_URL` uses `https://` in the Environment variables, and verify `npm run build` ran successfully during deployment.
-- **Filament icons missing**: Run `php artisan filament:cache-components` in the Dokploy terminal for your app.
+| Symptom | Likely cause |
+| --- | --- |
+| `502 Bad Gateway` from nginx | `app` container failed health check. `docker compose logs app` — usually a missing env var or migration error |
+| Filament icons / CSS missing | Assets stage didn't run. Force-rebuild without cache |
+| `SQLSTATE[08006]` or `connection refused` | `DB_HOST` must be `db`, not `localhost` or `127.0.0.1` |
+| Queue jobs stuck | `docker compose logs worker`. Restart with `docker compose restart worker` |
+| Storage uploads disappear after redeploy | You're writing into the image instead of the `app-storage` volume — check `FILESYSTEM_DISK=public` and that `storage/` is the named volume |
+| `Class "Redis" not found` | The PHP redis extension wasn't built. Confirm the `Dockerfile` ran `pecl install redis && docker-php-ext-enable redis` |
+| Permission denied on `storage/` | Run `docker compose exec app chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache` |
+
+---
+
+## What this stack does **not** include
+
+- **Octane / RoadRunner** — IEEPIS uses standard PHP-FPM. If you need persistent workers, swap the `app` command to `php artisan octane:start --server=swoole --host=0.0.0.0 --port=9000` and add the swoole extension to the Dockerfile.
+- **Horizon** — the `worker` service runs `queue:work` directly. Switch to Horizon by changing the worker command and exposing its dashboard.
+- **CDN / object storage** — files are served by nginx from the `app-storage` volume. For large media, reconfigure `FILESYSTEM_DISK=s3` and add S3 credentials.

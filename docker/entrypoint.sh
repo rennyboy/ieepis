@@ -32,25 +32,26 @@ wait_for_db "${DB_HOST}" "${DB_PORT}" "${DB_USERNAME}" "${DB_DATABASE}"
 if [ "$1" = "php-fpm" ]; then
     # Clear existing caches
     echo "Clearing application cache..."
-    php artisan config:clear 2>/dev/null || true
-    php artisan cache:clear 2>/dev/null || true
-    php artisan view:clear 2>/dev/null || true
+    php artisan config:clear || true
+    php artisan cache:clear || true
+    php artisan view:clear || true
 
     # Run migrations
     echo "Running database migrations..."
-    php artisan migrate --force 2>/dev/null || {
-        echo "Migration warning, continuing..."
+    php artisan migrate --force || {
+        echo "Migration failed!"
+        exit 1
     }
 
     # Ensure public storage symlink exists
     echo "Linking public storage..."
-    php artisan storage:link --force 2>/dev/null || true
+    php artisan storage:link --force || true
 
     # Optimize application for production
     echo "Optimizing application..."
-    php artisan config:cache 2>/dev/null || true
-    php artisan route:cache 2>/dev/null || true
-    php artisan view:cache 2>/dev/null || true
+    php artisan config:cache || true
+    php artisan route:cache || true
+    php artisan view:cache || true
 
     # Set proper permissions
     echo "Setting permissions..."
