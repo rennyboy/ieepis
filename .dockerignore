@@ -1,13 +1,60 @@
+# VCS / IDE
 .git
+.gitignore
+.gitattributes
+.idea
+.vscode
+.zed
+.fleet
+
+# Environment / secrets
 .env
-.env.backup
+.env.*
+!.env.example
+
+# Dependencies (rebuilt inside the image)
 node_modules
 vendor
+public/build
+public/hot
+
+# Local Laravel runtime state
 storage/logs/*
 storage/framework/cache/*
 storage/framework/sessions/*
 storage/framework/views/*
+storage/app/public/*
+storage/app/private/livewire-tmp
 bootstrap/cache/*
+public/storage
+
+# Tooling artefacts
 .phpunit.result.cache
+.phpunit.cache
+coverage
 npm-debug.log
 yarn-error.log
+pnpm-debug.log
+*.log
+
+# Project memory / docs not needed in the image
+SecondBrain
+.ai
+.agents
+.claude
+.cursor
+.kilocode
+.opencode
+.windsurfrules
+.cursorrules
+docs
+
+# Compose / dev-only files
+docker-compose.local.yml
+docker-compose.hybrid.yml
+docker-compose.yml
+compose.yaml
+
+# OS junk
+.DS_Store
+Thumbs.db
