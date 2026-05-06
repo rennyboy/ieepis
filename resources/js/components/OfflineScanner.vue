@@ -7,6 +7,11 @@
       </div>
     </div>
 
+    <!-- Offline Indicator -->
+    <div v-if="!isOnline" class="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800">
+      📡 You are offline. QR codes will be saved and synced when you reconnect.
+    </div>
+
     <!-- Offline Queue Status -->
     <div v-if="offlineQueue.length > 0" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex justify-between items-center">
       <span>{{ offlineQueue.length }} scan(s) waiting to sync...</span>
@@ -16,37 +21,37 @@
     <!-- Scanner Area -->
     <div v-show="scanning" id="qr-reader-vue" class="w-full mt-4 overflow-hidden rounded-lg border border-gray-200"></div>
 
-    <!-- Action Buttons -->
+     <!-- Action Buttons -->
     <div class="mt-6 flex flex-col sm:flex-row gap-3">
       <button 
         v-if="!scanning" 
         @click="startScanning" 
-        class="flex-1 px-4 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition flex justify-center items-center gap-2 shadow-sm">
+        class="flex-1 px-4 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition flex justify-center items-center gap-2 shadow-sm text-lg">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
         Open Camera
       </button>
       <button 
         v-if="scanning" 
         @click="stopScanning" 
-        class="flex-1 px-4 py-3 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition flex justify-center items-center shadow-sm">
+        class="flex-1 px-4 py-3 bg-red-500 text-white font-bold rounded-lg hover:bg-red-600 transition flex justify-center items-center shadow-sm text-lg">
         Stop Camera
       </button>
     </div>
 
     <!-- Manual Entry Fallback -->
     <div class="mt-6 pt-6 border-t border-gray-100">
-      <label class="block text-sm font-medium text-gray-700 mb-2" for="manual-code">Enter QR code manually</label>
+      <label class="block text-sm font-bold text-black mb-2" for="manual-code">Enter QR Code Manually</label>
       <div class="flex gap-2">
         <input 
           type="text" 
           id="manual-code" 
           v-model="manualCode" 
           @keyup.enter="submitManual"
-          class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition" 
+          class="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition text-black" 
           placeholder="e.g. EQ-123 or Property Number" />
         <button 
           @click="submitManual" 
-          class="px-4 py-2 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-700 transition">
+          class="px-4 py-2 bg-gray-800 text-white font-bold rounded-lg hover:bg-gray-700 transition">
           Submit
         </button>
       </div>
@@ -64,6 +69,15 @@ import { ref, onMounted, onUnmounted } from 'vue';
 import localforage from 'localforage';
 import axios from 'axios';
 import { Html5Qrcode } from 'html5-qrcode';
+
+// Configure axios to send cookies with requests (required for session auth)
+axios.defaults.withCredentials = true;
+
+// Set CSRF token if available
+const csrfToken = document.querySelector('meta[name="csrf-token"]');
+if (csrfToken) {
+  axios.defaults.headers.common['X-CSRF-TOKEN'] = csrfToken.getAttribute('content');
+}
 
 // State
 const scanning = ref(false);

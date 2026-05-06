@@ -49,10 +49,12 @@ class QrScanner extends Component
         try {
             if ($prefix === 'EQ') {
                 $equipment = \App\Models\Equipment::withTrashed()->findOrFail($id);
-                return redirect(\App\Filament\Resources\EquipmentResource::getUrl('edit', ['record' => $equipment]));
+                $url = \App\Filament\Resources\EquipmentResource::getUrl('view', ['record' => $equipment]);
+                return $this->redirect($url);
             } elseif ($prefix === 'EM') {
                 $employee = \App\Models\Employee::withTrashed()->findOrFail($id);
-                return redirect(\App\Filament\Resources\EmployeeResource::getUrl('edit', ['record' => $employee]));
+                $url = \App\Filament\Resources\EmployeeResource::getUrl('view', ['record' => $employee]);
+                return $this->redirect($url);
             } else {
                 $this->errorMessage = 'Unknown QR prefix.';
             }

@@ -5,70 +5,83 @@ namespace App\Filament\Pages;
 use App\Models\District;
 use App\Models\Equipment;
 use App\Models\Employee;
+use App\Scopes\SchoolScope;
 use Illuminate\Support\Facades\DB;
 
 class DcpDistributionData
 {
     public static function getData(): array
     {
-        // Get all active districts with their schools and equipment counts
-        return District::with(['schools.equipment'])
+        return DB::table('districts as d')
+            ->select([
+                'd.id',
+                'd.name',
+                DB::raw('(SELECT COUNT(*) FROM schools s
+                    JOIN equipment e ON e.school_id = s.id
+                    WHERE s.district_id = d.id AND s.deleted_at IS NULL
+                    AND e.is_dcp = true AND e.deleted_at IS NULL
+                    AND (e.dcp_package = ? OR (e.equipment_type = ? AND LOWER(e.dcp_package) LIKE ?))
+                ) as l4t'),
+                DB::raw('(SELECT COUNT(*) FROM schools s
+                    JOIN equipment e ON e.school_id = s.id
+                    WHERE s.district_id = d.id AND s.deleted_at IS NULL
+                    AND e.is_dcp = true AND e.deleted_at IS NULL
+                    AND (e.dcp_package = ? OR (e.equipment_type = ? AND LOWER(e.dcp_package) LIKE ?))
+                ) as l4nt'),
+                DB::raw('(SELECT COUNT(*) FROM schools s
+                    JOIN equipment e ON e.school_id = s.id
+                    WHERE s.district_id = d.id AND s.deleted_at IS NULL
+                    AND e.is_dcp = true AND e.deleted_at IS NULL
+                    AND (e.dcp_package = ? OR LOWER(e.equipment_type) LIKE ?)
+                ) as stv'),
+                DB::raw('(SELECT COUNT(*) FROM schools s
+                    JOIN equipment e ON e.school_id = s.id
+                    WHERE s.district_id = d.id AND s.deleted_at IS NULL
+                    AND e.is_dcp = true AND e.deleted_at IS NULL
+                ) as total'),
+                DB::raw('(SELECT COUNT(*) FROM schools s
+                    JOIN employees emp ON emp.school_id = s.id
+                    WHERE s.district_id = d.id AND s.deleted_at IS NULL
+                    AND emp.deleted_at IS NULL
+                ) as psi_pop'),
+            ])
+            ->addBinding(['L4T', 'Laptop', '%teaching%', 'L4NT', 'Laptop', '%non-teaching%', 'STV', '%tv%'], 'select')
+            ->orderBy('d.name')
             ->get()
-            ->map(function ($district) {
-                $equipment = $district->schools->flatMap->equipment;
-                
-                // Filter DCP equipment only
-                $dcpEquipment = $equipment->where('is_dcp', true);
-                
-                // Count by DCP package type if available, otherwise by equipment type
-                $l4t = $dcpEquipment->filter(function ($item) {
-                    return $item->dcp_package === 'L4T' || 
-                           ($item->equipment_type === 'Laptop' && str_contains($item->dcp_package ?? '', 'Teaching'));
-                })->count();
-                
-                $l4nt = $dcpEquipment->filter(function ($item) {
-                    return $item->dcp_package === 'L4NT' || 
-                           ($item->equipment_type === 'Laptop' && str_contains($item->dcp_package ?? '', 'Non-Teaching'));
-                })->count();
-                
-                $stv = $dcpEquipment->where('equipment_type', 'TV')->count();
-                $total = $dcpEquipment->count();
-                
-                // Population - Count employees in schools of this district
-                $psi_pop = $district->schools->flatMap->employees->count();
-                
-                return [
-                    'id' => $district->id,
-                    'level' => strtoupper($district->name),
-                    'l4nt' => $l4nt,
-                    'l4t' => $l4t,
-                    'stv' => $stv,
-                    'total' => $total,
-                    'psi_pop' => $psi_pop ?: 1, // Avoid division by zero
-                    'percent_ict' => $psi_pop ? round(($total / $psi_pop) * 100) . '%' : '0%',
-                    'percent_l4t' => $psi_pop ? round(($l4t / $psi_pop) * 100) . '%' : '0%',
-                    'percent_stv' => $psi_pop ? round(($stv / $psi_pop) * 100) . '%' : '0%',
-                ];
-            })
+            ->map(fn ($row) => [
+                'id' => $row->id,
+                'level' => strtoupper($row->name),
+                'l4nt' => (int) $row->l4nt,
+                'l4t' => (int) $row->l4t,
+                'stv' => (int) $row->stv,
+                'total' => (int) $row->total,
+                'psi_pop' => (int) $row->psi_pop,
+                'percent_ict' => $row->psi_pop ? round(($row->total / $row->psi_pop) * 100) . '%' : '0%',
+                'percent_l4t' => $row->psi_pop ? round(($row->l4t / $row->psi_pop) * 100) . '%' : '0%',
+                'percent_stv' => $row->psi_pop ? round(($row->stv / $row->psi_pop) * 100) . '%' : '0%',
+            ])
             ->toArray();
     }
 
     public static function getTotals(): array
     {
-        $dcpEquipment = Equipment::where('is_dcp', true)->get();
-        
+        $totals = DB::table('equipment')
+            ->where('is_dcp', true)
+            ->whereNull('deleted_at')
+            ->selectRaw('
+                COUNT(CASE WHEN dcp_package = ? OR (equipment_type = ? AND LOWER(dcp_package) LIKE ?) THEN 1 END) as l4t,
+                COUNT(CASE WHEN dcp_package = ? OR (equipment_type = ? AND LOWER(dcp_package) LIKE ?) THEN 1 END) as l4nt,
+                COUNT(CASE WHEN dcp_package = ? OR LOWER(equipment_type) LIKE ? THEN 1 END) as stv,
+                COUNT(*) as total
+            ', ['L4T', 'Laptop', '%teaching%', 'L4NT', 'Laptop', '%non-teaching%', 'STV', '%tv%'])
+            ->first();
+
         return [
-            'l4nt' => $dcpEquipment->filter(function ($item) {
-                return $item->dcp_package === 'L4NT' || 
-                       ($item->equipment_type === 'Laptop' && str_contains($item->dcp_package ?? '', 'Non-Teaching'));
-            })->count(),
-            'l4t' => $dcpEquipment->filter(function ($item) {
-                return $item->dcp_package === 'L4T' || 
-                       ($item->equipment_type === 'Laptop' && str_contains($item->dcp_package ?? '', 'Teaching'));
-            })->count(),
-            'stv' => $dcpEquipment->where('equipment_type', 'TV')->count(),
-            'total' => $dcpEquipment->count(),
-            'psi_pop' => Employee::count(),
+            'l4t' => (int) $totals->l4t,
+            'l4nt' => (int) $totals->l4nt,
+            'stv' => (int) $totals->stv,
+            'total' => (int) $totals->total,
+            'psi_pop' => Employee::withoutGlobalScope(SchoolScope::class)->count(),
         ];
     }
 }

@@ -13,6 +13,12 @@ use Illuminate\Auth\Access\AuthorizationException;
 
 class OfflineSyncController extends Controller
 {
+    public function __construct()
+    {
+        // Ensure only authenticated users can access scanner endpoints
+        $this->middleware('auth');
+    }
+
     /**
      * Handle an online scan (direct resolution)
      */
@@ -30,7 +36,7 @@ class OfflineSyncController extends Controller
                     Gate::authorize('view', $equipment);
                     
                     return response()->json([
-                        'redirect' => \App\Filament\Resources\EquipmentResource::getUrl('edit', ['record' => $equipment])
+                        'redirect' => \App\Filament\Resources\EquipmentResource::getUrl('view', ['record' => $equipment])
                     ]);
                 }
             }
@@ -46,14 +52,14 @@ class OfflineSyncController extends Controller
                     Gate::authorize('view', $equipment);
                     
                     return response()->json([
-                        'redirect' => \App\Filament\Resources\EquipmentResource::getUrl('edit', ['record' => $equipment])
+                        'redirect' => \App\Filament\Resources\EquipmentResource::getUrl('view', ['record' => $equipment])
                     ]);
                 } elseif ($prefix === 'EM') {
                     $employee = Employee::withTrashed()->findOrFail($id);
                     Gate::authorize('view', $employee);
                     
                     return response()->json([
-                        'redirect' => \App\Filament\Resources\EmployeeResource::getUrl('edit', ['record' => $employee])
+                        'redirect' => \App\Filament\Resources\EmployeeResource::getUrl('view', ['record' => $employee])
                     ]);
                 }
             }
@@ -64,7 +70,7 @@ class OfflineSyncController extends Controller
                 Gate::authorize('view', $equipment);
                 
                 return response()->json([
-                    'redirect' => \App\Filament\Resources\EquipmentResource::getUrl('edit', ['record' => $equipment])
+                    'redirect' => \App\Filament\Resources\EquipmentResource::getUrl('view', ['record' => $equipment])
                 ]);
             }
 

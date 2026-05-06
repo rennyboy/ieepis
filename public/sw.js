@@ -1,9 +1,10 @@
-const CACHE_NAME = 'ieepis-pwa-cache-v2';
-const RUNTIME_CACHE = 'ieepis-runtime-v2';
+const CACHE_NAME = 'ieepis-pwa-cache-v3';
+const RUNTIME_CACHE = 'ieepis-runtime-v3';
 const urlsToCache = [
   '/',
   '/offline.html',
-  '/images/ieepis-logo.png'
+  '/images/ieepis-logo.png',
+  '/admin/qr-scanner-page',
 ];
 
 // Routes that should serve the cached HTML shell when offline so the Vue app can boot
@@ -15,6 +16,8 @@ const OFFLINE_SHELL_ROUTES = [
 // API endpoints whose JSON we cache for offline reads (stale-while-revalidate)
 const OFFLINE_API_ROUTES = [
   '/equipment/offline/cache',
+  '/scanner/resolve',
+  '/scanner/sync',
 ];
 
 // Install event - cache core assets
