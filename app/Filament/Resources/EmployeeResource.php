@@ -252,8 +252,11 @@ class EmployeeResource extends Resource
                                 'text/csv',
                                 'text/plain',
                                 'application/csv',
-                                '.csv',
+                                'application/octet-stream',
+                                'text/x-csv',
+                                'text/comma-separated-values',
                             ])
+                            ->rules(['file', 'mimes:csv,txt,xlsx,xls'])
                             ->maxSize(10240)
                             ->required(),
                     ])
