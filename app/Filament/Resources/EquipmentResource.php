@@ -476,6 +476,15 @@ class EquipmentResource extends Resource
                     ->modalHeading('Import Equipment from Excel')
                     ->modalDescription('Upload an Excel file (.xlsx, .xls, or .csv) to import equipment.')
                     ->form([
+                        Forms\Components\Select::make('target_school_id')
+                            ->label('Target School')
+                            ->helperText('Rows without a "school" column will land in this school.')
+                            ->options(fn () => \App\Models\School::orderBy('name')->pluck('name', 'id'))
+                            ->searchable()
+                            ->default(fn () => \Illuminate\Support\Facades\Auth::user()?->school_id)
+                            ->disabled(fn () => \Illuminate\Support\Facades\Auth::user()?->hasRole('school-admin') ?? false)
+                            ->dehydrated()
+                            ->required(),
                         Forms\Components\FileUpload::make('file')
                             ->label('Select File')
                             ->directory('imports')
@@ -495,7 +504,7 @@ class EquipmentResource extends Resource
                     ])
                     ->action(function (array $data) {
                         try {
-                            $import = new \App\Imports\EquipmentImport();
+                            $import = new \App\Imports\EquipmentImport((int) $data['target_school_id']);
                             Excel::import($import, $data['file'], 'public');
                             
                             if ($import->getRowCount() === 0) {
