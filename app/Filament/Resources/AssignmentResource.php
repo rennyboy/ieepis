@@ -58,8 +58,13 @@ class AssignmentResource extends Resource
                         ->relationship(
                             'equipment',
                             'model',
-                            fn (Builder $query, Forms\Get $get) => $query
-                                ->where('accountability_status', 'unassigned')
+                            fn (Builder $query, Forms\Get $get, ?EquipmentAssignment $record) => $query
+                                ->where(function (Builder $q) use ($record): void {
+                                    $q->where('accountability_status', 'unassigned');
+                                    if ($record?->equipment_id) {
+                                        $q->orWhere('id', $record->equipment_id);
+                                    }
+                                })
                                 ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
                         )
                         ->getOptionLabelFromRecordUsing(
@@ -118,6 +123,22 @@ class AssignmentResource extends Resource
                             'RRPE' => 'RRPE',
                         ]),
                     Forms\Components\TextInput::make('supporting_doc_no')->label('Document No.'),
+                    Forms\Components\FileUpload::make('supporting_doc_file')
+                        ->label('Upload Document (PDF / Image)')
+                        ->helperText('Optional. Attach the scanned ICS / PAR / RRSP / RRPE — PDF or photo, up to 10 MB.')
+                        ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+                        ->directory(fn (Forms\Get $get) => 'schools/' . ($get('school_id') ?? 'general') . '/assignments')
+                        ->maxSize(10240)
+                        ->openable()
+                        ->downloadable()
+                        ->previewable()
+                        ->columnSpanFull()
+                        ->dehydrated(true)
+                        ->afterStateHydrated(function (Forms\Components\FileUpload $component, ?EquipmentAssignment $record): void {
+                            if ($record && ($doc = $record->issuanceDocument())) {
+                                $component->state([$doc->file_path]);
+                            }
+                        }),
                     Forms\Components\DatePicker::make('assigned_at')
                         ->label('Date Assigned')
                         ->required()
@@ -165,6 +186,22 @@ class AssignmentResource extends Resource
                     ->badge()
                     ->color('gray'),
                 Tables\Columns\TextColumn::make('supporting_doc_no')->label('Doc No.'),
+                Tables\Columns\TextColumn::make('issuance_doc')
+                    ->label('Issuance File')
+                    ->badge()
+                    ->color('success')
+                    ->getStateUsing(fn (EquipmentAssignment $r) => $r->issuanceDocument()?->document_type?->value)
+                    ->url(fn (EquipmentAssignment $r) => $r->issuanceDocument()?->file_url, true)
+                    ->placeholder('—')
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('return_doc')
+                    ->label('Return File')
+                    ->badge()
+                    ->color('warning')
+                    ->getStateUsing(fn (EquipmentAssignment $r) => $r->returnDocument()?->document_type?->value)
+                    ->url(fn (EquipmentAssignment $r) => $r->returnDocument()?->file_url, true)
+                    ->placeholder('—')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('assigned_at')
                     ->label('Assigned')
                     ->date()
@@ -199,7 +236,7 @@ class AssignmentResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['equipment', 'employee', 'custodian', 'school', 'assignedBy']);
+            ->with(['equipment', 'employee', 'custodian', 'school', 'assignedBy', 'documents']);
     }
 
     public static function getPages(): array

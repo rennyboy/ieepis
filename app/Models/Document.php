@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $school_id
  * @property int|null $equipment_id
  * @property int|null $employee_id
+ * @property int|null $equipment_assignment_id
  * @property string $document_type
  * @property string|null $document_no
  * @property string $title
@@ -36,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @method BelongsTo school()
  * @method BelongsTo equipment()
  * @method BelongsTo employee()
+ * @method BelongsTo equipmentAssignment()
  * @method BelongsTo uploadedBy()
  */
 class Document extends Model
@@ -46,6 +48,7 @@ class Document extends Model
         "school_id",
         "equipment_id",
         "employee_id",
+        "equipment_assignment_id",
         "document_type",
         "document_no",
         "title",
@@ -90,6 +93,14 @@ class Document extends Model
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\EquipmentAssignment, self>
+     */
+    public function equipmentAssignment(): BelongsTo
+    {
+        return $this->belongsTo(EquipmentAssignment::class);
     }
 
     /**

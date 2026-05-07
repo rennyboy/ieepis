@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Scopes\SchoolScope;
+use App\Enums\DocumentType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -37,6 +39,7 @@ use App\Enums\TransactionType;
  * @method BelongsTo employee()
  * @method BelongsTo custodian()
  * @method BelongsTo assignedBy()
+ * @method HasMany documents()
  */
 class EquipmentAssignment extends Model
 {
@@ -122,5 +125,37 @@ class EquipmentAssignment extends Model
     public function assignedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_by_id');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Document>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
+    }
+
+    public function issuanceDocument(): ?Document
+    {
+        $type = $this->supporting_doc_type
+            ? DocumentType::tryFrom($this->supporting_doc_type)
+            : DocumentType::ICS;
+
+        $type ??= DocumentType::ICS;
+
+        if ($this->relationLoaded('documents')) {
+            return $this->documents->firstWhere('document_type', $type);
+        }
+
+        return $this->documents()->where('document_type', $type)->latest()->first();
+    }
+
+    public function returnDocument(): ?Document
+    {
+        if ($this->relationLoaded('documents')) {
+            return $this->documents->firstWhere('document_type', DocumentType::RRSP);
+        }
+
+        return $this->documents()->where('document_type', DocumentType::RRSP)->latest()->first();
     }
 }
