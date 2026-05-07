@@ -43,39 +43,67 @@ class AssignmentResource extends Resource
                             return ! $user->hasRole('super-admin');
                         })
                         ->default(fn () => Auth::user()?->school_id)
+                        ->dehydrated()
                         ->searchable()
                         ->preload()
+                        ->live()
+                        ->afterStateUpdated(function (Forms\Set $set): void {
+                            $set('equipment_id', null);
+                            $set('employee_id', null);
+                            $set('custodian_id', null);
+                        })
                         ->required(),
                     Forms\Components\Select::make('equipment_id')
                         ->label('Equipment')
                         ->relationship(
                             'equipment',
                             'model',
-                            fn ($query) => $query->where('accountability_status', 'unassigned'),
+                            fn (Builder $query, Forms\Get $get) => $query
+                                ->where('accountability_status', 'unassigned')
+                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
                         )
                         ->getOptionLabelFromRecordUsing(
                             fn (Equipment $record): string => "{$record->brand} {$record->model} ({$record->property_no})",
                         )
                         ->searchable(['brand', 'model', 'property_no', 'serial_number'])
+                        ->preload()
                         ->required()
+                        ->disabled(fn (Forms\Get $get) => blank($get('school_id')))
+                        ->placeholder(fn (Forms\Get $get) => blank($get('school_id'))
+                            ? 'Pick a school first'
+                            : 'Select equipment')
                         ->disabledOn('edit'),
                     Forms\Components\Select::make('employee_id')
                         ->label('Accountable Officer')
                         ->relationship(
                             'employee',
                             'full_name',
-                            fn ($query) => $query->where('status', 'active'),
+                            fn (Builder $query, Forms\Get $get) => $query
+                                ->where('status', 'active')
+                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
                         )
                         ->searchable()
-                        ->required(),
+                        ->preload()
+                        ->required()
+                        ->disabled(fn (Forms\Get $get) => blank($get('school_id')))
+                        ->placeholder(fn (Forms\Get $get) => blank($get('school_id'))
+                            ? 'Pick a school first'
+                            : 'Select officer'),
                     Forms\Components\Select::make('custodian_id')
                         ->label('Custodian / End User (if different)')
                         ->relationship(
                             'custodian',
                             'full_name',
-                            fn ($query) => $query->where('status', 'active'),
+                            fn (Builder $query, Forms\Get $get) => $query
+                                ->where('status', 'active')
+                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
                         )
                         ->searchable()
+                        ->preload()
+                        ->disabled(fn (Forms\Get $get) => blank($get('school_id')))
+                        ->placeholder(fn (Forms\Get $get) => blank($get('school_id'))
+                            ? 'Pick a school first'
+                            : 'Optional')
                         ->nullable(),
                     Forms\Components\Select::make('transaction_type')
                         ->options(TransactionType::options())

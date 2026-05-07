@@ -34,6 +34,7 @@ if [ "$1" = "php-fpm" ]; then
     php artisan cache:clear || true
     php artisan view:clear || true
     php artisan route:clear || true
+    php -r 'opcache_reset();' 2>/dev/null || true
 
     echo "Resetting Spatie permission cache..."
     php artisan permission:cache-reset || true

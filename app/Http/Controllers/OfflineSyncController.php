@@ -13,15 +13,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 
 class OfflineSyncController extends Controller
 {
-    public function __construct()
-    {
-        // Ensure only authenticated users can access scanner endpoints
-        $this->middleware('auth');
-    }
-
-    /**
-     * Handle an online scan (direct resolution)
-     */
     public function resolve(ScanResolveRequest $request)
     {
         $code = trim($request->validated('code'));
