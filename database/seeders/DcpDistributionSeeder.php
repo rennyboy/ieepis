@@ -27,7 +27,7 @@ class DcpDistributionSeeder extends Seeder
             );
 
             // 2. Districts
-            $districts = ['Baylimango', 'Barcelona', 'Dapitan', 'Sulangon', 'Potungan'];
+            $districts = ['Baylimango', 'Barcelona', 'Dapitan City', 'Sulangon', 'Potungan'];
 
             foreach ($districts as $districtName) {
                 $district = District::updateOrCreate(
