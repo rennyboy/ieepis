@@ -24,14 +24,10 @@ class AssignmentsRelationManager extends RelationManager
         return $form->schema([]);
     }
 
-    protected function getTableQuery(): Builder
-    {
-        return parent::getTableQuery()->with('documents');
-    }
-
     public function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('documents'))
             ->recordTitleAttribute('id')
             ->columns([
                 Tables\Columns\TextColumn::make('employee.full_name')
