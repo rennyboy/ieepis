@@ -34,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Production-tuned PHP config
+# OPcache enabled with development-friendly file validation (revalidates on change)
 RUN { \
         echo "memory_limit=512M"; \
         echo "upload_max_filesize=64M"; \
@@ -44,21 +44,24 @@ RUN { \
         echo "opcache.memory_consumption=192"; \
         echo "opcache.interned_strings_buffer=16"; \
         echo "opcache.max_accelerated_files=20000"; \
-        echo "opcache.validate_timestamps=0"; \
-    } > /usr/local/etc/php/conf.d/zz-production.ini
+        echo "opcache.validate_timestamps=1"; \
+        echo "opcache.revalidate_freq=0"; \
+        echo "opcache.fast_shutdown=1"; \
+    } > /usr/local/etc/php/conf.d/zz-opcache.ini
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
 
-# Install PHP deps with cached layer
+# Install PHP deps with cached layer.
+# INSTALL_DEV=true keeps dev packages (telescope, debugbar, faker) for local containers.
+ARG INSTALL_DEV=false
 COPY composer.json composer.lock ./
-RUN composer install \
-        --no-dev \
-        --optimize-autoloader \
-        --no-scripts \
-        --no-interaction \
-        --prefer-dist
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+        composer install --optimize-autoloader --no-scripts --no-interaction --prefer-dist; \
+    else \
+        composer install --no-dev --optimize-autoloader --no-scripts --no-interaction --prefer-dist; \
+    fi
 
 # Copy application source
 COPY . .
@@ -69,8 +72,13 @@ COPY --from=assets /app/public/build ./public/build
 # Bake the storage symlink so it exists in any image derived from this stage
 RUN ln -sfn /var/www/storage/app/public /var/www/public/storage
 
-# Finalize autoload (runs package:discover + filament:upgrade via post-autoload-dump)
-RUN composer dump-autoload --optimize --no-dev
+# Finalize autoload (runs package:discover + filament:upgrade via post-autoload-dump).
+# Match the install flavor so the classmap stays consistent.
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+        composer dump-autoload --optimize; \
+    else \
+        composer dump-autoload --optimize --no-dev; \
+    fi
 
 # Entrypoint
 COPY docker/entrypoint.sh /entrypoint.sh
