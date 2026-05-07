@@ -7,6 +7,7 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Read-only assignment history for a piece of equipment.
@@ -23,6 +24,11 @@ class AssignmentsRelationManager extends RelationManager
         return $form->schema([]);
     }
 
+    protected function getTableQuery(): Builder
+    {
+        return parent::getTableQuery()->with('documents');
+    }
+
     public function table(Table $table): Table
     {
         return $table
@@ -35,6 +41,20 @@ class AssignmentsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('transaction_type')->badge()->color('info'),
                 Tables\Columns\TextColumn::make('supporting_doc_type')->badge()->color('gray'),
                 Tables\Columns\TextColumn::make('supporting_doc_no')->label('Doc No.'),
+                Tables\Columns\TextColumn::make('issuance_doc')
+                    ->label('Issuance File')
+                    ->badge()
+                    ->color('success')
+                    ->getStateUsing(fn (EquipmentAssignment $r) => $r->issuanceDocument()?->document_type?->value)
+                    ->url(fn (EquipmentAssignment $r) => $r->issuanceDocument()?->file_url, true)
+                    ->placeholder('—'),
+                Tables\Columns\TextColumn::make('return_doc')
+                    ->label('Return File')
+                    ->badge()
+                    ->color('warning')
+                    ->getStateUsing(fn (EquipmentAssignment $r) => $r->returnDocument()?->document_type?->value)
+                    ->url(fn (EquipmentAssignment $r) => $r->returnDocument()?->file_url, true)
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('assigned_at')->date()->sortable(),
                 Tables\Columns\TextColumn::make('returned_at')->date()->label('Returned'),
                 Tables\Columns\TextColumn::make('assignedBy.name')->label('Assigned By'),
