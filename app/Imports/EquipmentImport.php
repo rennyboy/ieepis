@@ -144,11 +144,16 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
             $row['property_no'] = $row['serial_number'];
         }
 
-        if (! empty($row['equipment_type'])) {
-            $row['equipment_type'] = (string) $row['equipment_type'];
-        }
-        if (! empty($row['property_no'])) {
-            $row['property_no'] = (string) $row['property_no'];
+        $stringFields = [
+            'property_no', 'old_property_no', 'serial_number', 'equipment_type',
+            'brand', 'model', 'specifications', 'classification', 'school',
+            'dcp_package', 'dcp_year', 'mode_of_acquisition', 'source_of_acquisition',
+            'supplier', 'equipment_location', 'remarks',
+        ];
+        foreach ($stringFields as $f) {
+            if (isset($row[$f]) && $row[$f] !== null && $row[$f] !== '') {
+                $row[$f] = (string) $row[$f];
+            }
         }
 
         return $row;
