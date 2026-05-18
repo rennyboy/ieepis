@@ -150,14 +150,16 @@ class EmployeeImport implements ToModel, WithHeadingRow, WithValidation, SkipsEm
             }
         }
 
-        if (! empty($row['employee_number'])) {
-            $row['employee_number'] = (string) $row['employee_number'];
-        }
-        if (! empty($row['first_name'])) {
-            $row['first_name'] = (string) $row['first_name'];
-        }
-        if (! empty($row['last_name'])) {
-            $row['last_name'] = (string) $row['last_name'];
+        $stringFields = [
+            'employee_number', 'first_name', 'last_name', 'middle_name', 'suffix',
+            'position', 'department', 'ro_office', 'sdo_office', 'employment_type',
+            'status', 'school', 'email', 'personal_email', 'mobile_1', 'mobile_2',
+            'oic_office', 'cause_of_separation', 'detailed_from', 'detailed_to',
+        ];
+        foreach ($stringFields as $f) {
+            if (isset($row[$f]) && $row[$f] !== null && $row[$f] !== '') {
+                $row[$f] = (string) $row[$f];
+            }
         }
 
         return $row;
