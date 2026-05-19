@@ -40,3 +40,4 @@ storage/framework/views/*
 !storage/framework/views/.gitkeep
 storage/logs/*
 !storage/logs/.gitkeep
+core.*

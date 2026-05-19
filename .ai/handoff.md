@@ -2,33 +2,25 @@
 
 ## Last Updated
 
-2026-05-06
+2026-05-19
 
 ## What Was Completed
 
-- **QR Scanner Unauthorized Fix**: Resolved "Unauthorized" error when scanning QR codes.
-  - Found two QR scanner implementations: Livewire QrScanner and Vue OfflineScanner
-  - **Root Cause**: The actual scanner used (OfflineScanner.vue) posts to `/scanner/resolve` endpoint without authentication
-  - **Fix 1**: Added `auth` middleware to `OfflineSyncController.__construct()`
-  - **Fix 2**: Configured axios to send credentials (cookies) with `axios.defaults.withCredentials = true` in OfflineScanner.vue
-  - **Fix 3**: Added CSRF token configuration for axios requests
-  - **Fix 4**: Updated QrScannerPage.php permission check to explicitly allow super-admin
-  - **Fix 5**: Updated QrScanner.php Livewire redirect to use `$this->redirect()` method
-  - Rebuilt frontend assets with `npm run build`
-  - Cleared all Laravel caches
+- Full 2026-05-19 log rotated to `SecondBrain/Daily Notes/2026-05-19.md`. Summary:
+  - TicketResource: nav-badge scoping fix + enum; severity priority sort; **equipment + reporter + assigned-technician pickers fixed** (school-scoped relationship closure + preload).
+  - `TicketPolicy` created (mirrors `EquipmentPolicy`).
+  - `app:create-technician` command added + run — `technician@deped.gov.ph` now exists.
 
 ## Current Blockers
 
-- **Functional Testing**: Manual verification of QR scanner fix on a physical device with super-admin credentials.
+- None.
 
 ## Immediate Next Actions
 
-- **Test QR Scanner**: Scan a QR code with super-admin account and verify redirect works without "Unauthorized" error
-- **M6**: Refactor `app/Filament/Pages/DcpDistributionData.php` to move heavy aggregations from PHP to SQL queries.
-- **M5**: Expand PHPUnit coverage for Enum-casted models and the new production stack.
+- Carried: `Employee::getDisplayNameAttribute()` still embeds raw `(AUTO-…)` in equipment-assignment selects; hybrid Docker end-to-end verify (`.ai/memory-docker.md`); M6 `DcpDistributionData.php` SQL refactor; M5 PHPUnit coverage.
 
 ## Notes for Next Session
 
-- **Prod Build**: Use `docker compose -f docker-compose.prod.yml up -d --build` to verify the latest dependency fixes.
-- **QR Scanner Testing**: Test the scanner at `/admin/qr-scanner-page` with both super-admin and school-admin accounts.
-- **Consistency**: Maintain Postgres-first conventions now that Prod and Sail are aligned.
+- `viewer` role not seeded in DB; policies reference it harmlessly (matches Employee/Equipment).
+- Equipment is `SchoolScope`-bound — ticket equipment picker only lists items for the school selected on the form; pick the owning school.
+- Postgres `LOWER()/UPPER()` locale-dependent for non-ASCII — see pgsql case-sensitivity memory.

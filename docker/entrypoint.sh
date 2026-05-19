@@ -48,15 +48,19 @@ if [ "$1" = "php-fpm" ]; then
     echo "Linking public storage..."
     php artisan storage:link --force || true
 
-    echo "Optimizing application..."
-    php artisan config:cache || true
-    php artisan route:cache || true
-    php artisan view:cache || true
-    php artisan event:cache || true
+    if [ "$APP_ENV" != "local" ]; then
+        echo "Optimizing application..."
+        php artisan config:cache || true
+        php artisan route:cache || true
+        php artisan view:cache || true
+        php artisan event:cache || true
 
-    echo "Caching Filament components..."
-    php artisan filament:cache-components || true
-    php artisan icons:cache || true
+        echo "Caching Filament components..."
+        php artisan filament:cache-components || true
+        php artisan icons:cache || true
+    else
+        echo "APP_ENV=local — skipping config/route/view/event/filament/icons cache (avoids stale-cache headaches with bind-mounted source)."
+    fi
 
     echo "Setting permissions..."
     chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true

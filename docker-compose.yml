@@ -1,30 +1,14 @@
 # Development Docker Compose stack for IEEPIS
-# Use: docker compose up -d
-# This file uses bind mounts for local development
-
-x-app-env: &app-env
-  APP_NAME: ${APP_NAME:-IEEPIS}
-  APP_ENV: local
-  APP_DEBUG: "true"
-  APP_KEY: ${APP_KEY}
-  APP_URL: ${APP_URL:-http://localhost:8080}
-  LOG_CHANNEL: ${LOG_CHANNEL:-stack}
-  LOG_LEVEL: ${LOG_LEVEL:-debug}
-  DB_CONNECTION: pgsql
-  DB_HOST: db
-  DB_PORT: 5432
-  DB_DATABASE: ${DB_DATABASE:-ieepis_db}
-  DB_USERNAME: ${DB_USERNAME:-ieepis_user}
-  DB_PASSWORD: ${DB_PASSWORD:-ieepis_password}
-  CACHE_STORE: redis
-  REDIS_HOST: redis
-  REDIS_PORT: 6379
-  SESSION_DRIVER: redis
-  SESSION_LIFETIME: ${SESSION_LIFETIME:-120}
-  QUEUE_CONNECTION: redis
-  FILESYSTEM_DISK: ${FILESYSTEM_DISK:-local}
-  MAIL_MAILER: ${MAIL_MAILER:-log}
-  BROADCAST_DRIVER: ${BROADCAST_DRIVER:-log}
+# Usage: docker compose up -d
+#
+# Container runtime env: loaded from .env.docker (committed). Hostnames inside
+# the network use Docker service names (db, redis).
+# Host runtime env: lives in .env (gitignored). Host artisan reaches the Docker
+# Postgres via the published port 5432:5432 below.
+#
+# bootstrap/cache and storage/framework live on named volumes so container
+# writes never poison the host bind mount. Live editing of source still works
+# because the rest of the project is bind-mounted at /var/www.
 
 x-app-build: &app-build
   build:
@@ -33,6 +17,18 @@ x-app-build: &app-build
     target: app
     args:
       INSTALL_DEV: "true"
+  image: ieepis/app:dev
+  working_dir: /var/www
+  init: true
+  restart: unless-stopped
+  networks:
+    - ieepis-network
+
+x-app-volumes: &app-volumes
+  - .:/var/www:cached
+  - vendor-data:/var/www/vendor
+  - app-cache:/var/www/bootstrap/cache
+  - app-framework:/var/www/storage/framework
 
 x-logging: &default-logging
   driver: json-file
@@ -69,18 +65,12 @@ services:
 
   app:
     <<: *app-build
-    image: ieepis/app:dev
     container_name: ieepis-app-dev
-    restart: unless-stopped
-    working_dir: /var/www
-    init: true
+    env_file:
+      - .env.docker
     environment:
-      <<: *app-env
-    volumes:
-      - .:/var/www:cached
-      - vendor-data:/var/www/vendor
-    networks:
-      - ieepis-network
+      APP_KEY: ${APP_KEY}
+    volumes: *app-volumes
     depends_on:
       db:
         condition: service_healthy
@@ -96,20 +86,14 @@ services:
 
   worker:
     <<: *app-build
-    image: ieepis/app:dev
     container_name: ieepis-worker-dev
-    restart: unless-stopped
-    working_dir: /var/www
-    init: true
     command: php artisan queue:work redis --sleep=3 --tries=3 --max-time=3600 --max-jobs=1000 --backoff=10
+    env_file:
+      - .env.docker
     environment:
-      <<: *app-env
+      APP_KEY: ${APP_KEY}
       CONTAINER_ROLE: worker
-    volumes:
-      - .:/var/www:cached
-      - vendor-data:/var/www/vendor
-    networks:
-      - ieepis-network
+    volumes: *app-volumes
     depends_on:
       app:
         condition: service_healthy
@@ -122,20 +106,14 @@ services:
 
   scheduler:
     <<: *app-build
-    image: ieepis/app:dev
     container_name: ieepis-scheduler-dev
-    restart: unless-stopped
-    working_dir: /var/www
-    init: true
     command: sh -c "while true; do php artisan schedule:run --no-interaction --verbose --no-ansi; sleep 60; done"
+    env_file:
+      - .env.docker
     environment:
-      <<: *app-env
+      APP_KEY: ${APP_KEY}
       CONTAINER_ROLE: scheduler
-    volumes:
-      - .:/var/www:cached
-      - vendor-data:/var/www/vendor
-    networks:
-      - ieepis-network
+    volumes: *app-volumes
     depends_on:
       app:
         condition: service_healthy
@@ -145,17 +123,18 @@ services:
     image: postgres:16-alpine
     container_name: ieepis-db-dev
     restart: unless-stopped
+    env_file:
+      - .env.docker
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-ieepis_db}
-      POSTGRES_USER: ${DB_USERNAME:-ieepis_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-ieepis_password}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
     volumes:
       - db-data-dev:/var/lib/postgresql/data
     networks:
       - ieepis-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-ieepis_user} -d ${DB_DATABASE:-ieepis_db}"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -183,8 +162,6 @@ services:
     logging: *default-logging
 
   # Cloudflare Tunnel — opt-in via: docker compose --profile tunnel up -d
-  # Requires CLOUDFLARED_TUNNEL_TOKEN from a Named Tunnel in the Zero Trust dashboard.
-  # Configure the tunnel's public hostname to route to http://nginx:80.
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: ieepis-cloudflared-dev
@@ -210,4 +187,8 @@ volumes:
   redis-data-dev:
     driver: local
   vendor-data:
+    driver: local
+  app-cache:
+    driver: local
+  app-framework:
     driver: local

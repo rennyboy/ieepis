@@ -16,7 +16,8 @@
 - **011** Identity unified: `Employee` is canonical, `User` is auth-only shell linked via `employees.user_id` (unique nullable FK)
 - **012** Resource README files removed — drift was unmaintainable; canonical info lives in `.ai/memory.md` and the models
 - **013** Field-Ops PWA + scoped REST API — reverses 007 *only* for the PWA's return / ticket / equipment-lookup / issuance flows. Filament stays the system-of-record for admin work.
-- **014** Local dev environment — no Docker/Sail. Run `php artisan ...` / `composer ...` / `npm ...` directly. Supersedes 006.
+- **014** Local dev — never invoke commands through `vendor/bin/sail`. Run `php artisan ...` / `composer ...` / `npm ...` directly. Supersedes 006.
+- **015** Hybrid Docker dev — runtime stack (nginx/php-fpm/postgres/redis) runs in Docker; artisan/composer/npm still run on host against the published Postgres port. Clarifies 014.
 
 Full rationale + consequences for each: root `DECISIONS.md`.
 
@@ -59,6 +60,12 @@ Full rationale + consequences for each: root `DECISIONS.md`.
 **Reason**: User is CPU-constrained on the dev machine; Docker overhead is non-trivial and unnecessary for a single-dev local setup.
 **Trade-off**: Loses Sail's environment parity guarantee — local-only dev means subtle "works on my machine" risk for Postgres extensions, PHP version mismatches, etc. Mitigated by the DB-agnostic stance (Decision 010) and CI (when added).
 **Revisit if**: A second dev joins the project, OR a production-only dependency (e.g., Redis cluster, S3) becomes hard to mock locally.
+
+## [2026-05-08] — Hybrid Docker dev environment
+**Decision**: Run the runtime stack (nginx, php-fpm app, queue worker, scheduler, postgres 16, redis 7) in Docker via `docker compose up -d`, but keep `php artisan`, `composer`, `npm`, `psql`, `phpunit` on the host. The docker `db` service publishes `5432:5432` so host artisan reaches the same Postgres the browser app uses — single source of truth, no drift. Container env loads from `.env.docker` (committed); host env stays in `.env` (gitignored). `bootstrap/cache` and `storage/framework` move to named volumes so container-side cache writes never poison the host bind mount. Sail-based `Makefile` removed. Clarifies (does not supersede) Decision 014.
+**Reason**: User reverted to Docker-managed runtime to avoid having to maintain native Postgres + Redis + nginx + php-fpm on the laptop. Decision 014's "no Sail" rule still holds (sail is the wrapper that's prohibited), but Docker itself is back. Without the env-file split and named-volume isolation introduced here, host artisan was broken — the container's `entrypoint.sh` was running `config:cache` against the bind-mounted `bootstrap/cache/`, leaving the host with `DB_HOST=db` baked into a www-data-owned cache file.
+**Trade-off**: Two env files to keep coherent (mitigated by `APP_KEY` flowing from `.env` via compose interpolation, and DB credentials being identical in both). Slightly more Docker resource use on the laptop than pure-host dev. Local Postgres install must be stopped to free port 5432 — single shared DB now lives in the `db-data-dev` volume.
+**Revisit if**: Laptop CPU/RAM pressure returns and Decision 014's pure-host model becomes preferable again, OR production deployment moves off Docker (then this dev contract still works but the parity argument weakens).
 
 ## [2026-04-27] — Drop drifty resource README files
 **Decision**: Removed `EmployeeResource/README.md`, `EquipmentResource/README.md`, `SchoolResource/README.md`, `TicketResource/README.md`. Kept only `AssignmentResource/README.md` (recently rewritten and accurate).

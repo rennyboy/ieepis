@@ -23,8 +23,7 @@ storage/logs/*
 storage/framework/cache/*
 storage/framework/sessions/*
 storage/framework/views/*
-storage/app/public/*
-storage/app/private/livewire-tmp
+storage/app
 bootstrap/cache/*
 public/storage
 

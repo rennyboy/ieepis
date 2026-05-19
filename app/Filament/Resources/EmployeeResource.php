@@ -187,7 +187,14 @@ class EmployeeResource extends Resource
                     ->label('Employee No.')
                     ->searchable()
                     ->fontFamily('mono')
-                    ->color('primary'),
+                    ->badge(fn ($record): bool => ! $record->hasRealEmployeeNumber())
+                    ->formatStateUsing(fn ($record): string => $record->hasRealEmployeeNumber()
+                        ? $record->employee_number
+                        : 'No ID yet')
+                    ->color(fn ($record): string => $record->hasRealEmployeeNumber() ? 'primary' : 'gray')
+                    ->tooltip(fn ($record): ?string => $record->hasRealEmployeeNumber()
+                        ? null
+                        : 'No employee number issued yet — placeholder: '.$record->employee_number),
                 Tables\Columns\TextColumn::make('position')->searchable(),
                 Tables\Columns\TextColumn::make('school.name')
                     ->label('School')
@@ -221,6 +228,16 @@ class EmployeeResource extends Resource
                     'non-teaching' => 'Non-Teaching',
                 ]),
                 Tables\Filters\SelectFilter::make('status')->options(EmployeeStatus::options()),
+                Tables\Filters\TernaryFilter::make('employee_number_status')
+                    ->label('Employee No.')
+                    ->placeholder('All')
+                    ->trueLabel('Has employee number')
+                    ->falseLabel('Pending — no ID yet')
+                    ->queries(
+                        true: fn ($query) => $query->hasEmployeeNumber(),
+                        false: fn ($query) => $query->pendingEmployeeNumber(),
+                        blank: fn ($query) => $query,
+                    ),
             ])
             ->heading(new \Illuminate\Support\HtmlString(view('filament.components.export-button', [
                 'route' => 'employees.pdf.bulk',
