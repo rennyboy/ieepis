@@ -315,6 +315,19 @@ class EquipmentResource extends Resource
                     Forms\Components\Tabs\Tab::make('Issuance')
                         ->icon('heroicon-o-user-circle')
                         ->schema([
+                            Forms\Components\Select::make('accountable_officer_id')
+                                ->label('Accountable Officer (PAR/ICS holder)')
+                                ->relationship(
+                                    'accountableOfficer',
+                                    'full_name',
+                                    fn (Builder $query, Get $get) => $query
+                                        ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
+                                )
+                                ->searchable()
+                                ->preload()
+                                ->nullable()
+                                ->helperText('Employee fiscally accountable for this item per the delivery/PAR/ICS receipt. Changes are recorded as a property transfer in the activity log.')
+                                ->columnSpanFull(),
                             Forms\Components\Select::make('document_id')
                                 ->label('Linked Document (DR/PAR/ICS)')
                                 ->options(fn () => \App\Models\Document::whereIn('document_type', ['DR', 'PAR', 'ICS'])
@@ -376,7 +389,7 @@ class EquipmentResource extends Resource
                     ->limit(30)
                     ->tooltip(fn ($record) => $record->school?->name),
                 Tables\Columns\TextColumn::make(
-                    'activeAssignment.employee.full_name',
+                    'accountableOfficer.full_name',
                 )
                     ->label('Accountable Officer')
                     ->searchable()
@@ -692,7 +705,7 @@ class EquipmentResource extends Resource
         $user = \Illuminate\Support\Facades\Auth::user();
 
         $query = parent::getEloquentQuery()
-            ->with(['activeAssignment.employee', 'document'])
+            ->with(['accountableOfficer', 'activeAssignment.employee', 'document'])
             ->withCount(['assignments', 'maintenanceTickets']);
 
         $query->when(

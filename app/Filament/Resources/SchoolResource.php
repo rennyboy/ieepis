@@ -234,6 +234,14 @@ class SchoolResource extends Resource
             return $user->hasRole(['super-admin', 'division-admin']);
         }
 
+        // School-admins may view/edit their own school but never delete a
+        // school record (row Delete and bulk Delete are gated through can()).
+        if ($user->hasRole('school-admin') && in_array($action, [
+            'delete', 'deleteAny', 'forceDelete', 'forceDeleteAny', 'restore', 'restoreAny',
+        ], true)) {
+            return false;
+        }
+
         return parent::can($action, $record);
     }
 

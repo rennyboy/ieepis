@@ -257,19 +257,30 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
     }
 
     /**
-     * Link the equipment to its accountable officer (and custodian) as the
-     * single active assignment. Idempotent: re-importing the same row updates
-     * the existing open assignment instead of creating a duplicate.
+     * Apply accountability from the row. The accountable officer is now an
+     * equipment attribute (established at delivery, audited via LogsActivity);
+     * an EquipmentAssignment is only the rotating custodian/end-user record, so
+     * one is created (idempotently) only when a custodian is present.
+     * accountability_status tracks whether an active custodian exists.
      */
     private function syncAssignment(Equipment $equipment, array $row): void
     {
-        $employee = $this->resolveEmployee($row['accountable_officer'] ?? null, $equipment->school_id);
+        $officer = $this->resolveEmployee($row['accountable_officer'] ?? null, $equipment->school_id);
 
-        if (! $employee) {
-            return;
+        if ($officer && $equipment->accountable_officer_id !== $officer->id) {
+            $equipment->forceFill(['accountable_officer_id' => $officer->id])->save();
         }
 
         $custodian = $this->resolveEmployee($row['custodian'] ?? null, $equipment->school_id);
+
+        // No custodian → nothing to assign; the item still has its officer.
+        if (! $custodian) {
+            if ($equipment->accountability_status !== AccountabilityStatus::Unassigned) {
+                $equipment->forceFill(['accountability_status' => AccountabilityStatus::Unassigned])->save();
+            }
+
+            return;
+        }
 
         $transactionType = TransactionType::tryFrom(trim((string) ($row['transaction_type'] ?? '')))
             ?? TransactionType::BeginningInventory;
@@ -278,8 +289,10 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
             ['equipment_id' => $equipment->id, 'returned_at' => null],
             [
                 'school_id' => $equipment->school_id,
-                'employee_id' => $employee->id,
-                'custodian_id' => $custodian?->id,
+                // Legacy column kept populated for PAR/ICS PDF + exports
+                // (expand/contract); mirrors the equipment officer.
+                'employee_id' => $officer?->id ?? $equipment->accountable_officer_id,
+                'custodian_id' => $custodian->id,
                 'assigned_by_id' => Auth::id(),
                 'assigned_at' => $this->parseDate($row['assignment_date'] ?? null) ?? now()->toDateString(),
                 'transaction_type' => $transactionType,

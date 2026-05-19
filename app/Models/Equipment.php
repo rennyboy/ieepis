@@ -22,6 +22,7 @@ class Equipment extends Model
 
     protected $fillable = [
         "school_id",
+        "accountable_officer_id",
         "document_id",
         "property_no",
         "old_property_no",
@@ -125,6 +126,19 @@ class Equipment extends Model
     }
 
     /**
+     * The property-accountable officer (PAR/ICS holder), established at
+     * acquisition/delivery — distinct from the rotating custodian/end-user
+     * tracked per EquipmentAssignment. Changes here are audited via
+     * LogsActivity (property transfers).
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\Employee, self>
+     */
+    public function accountableOfficer(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'accountable_officer_id');
+    }
+
+    /**
      * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\EquipmentAssignment>
      */
     public function assignments(): HasMany
@@ -211,7 +225,10 @@ class Equipment extends Model
 
     public function getCurrentAccountableAttribute(): ?Employee
     {
-        return $this->activeAssignment?->employee;
+        // Accountability now lives on the equipment itself (set at delivery),
+        // not the assignment. Fall back to legacy assignment data for rows not
+        // yet backfilled (expand/contract — employee_id kept until contracted).
+        return $this->accountableOfficer ?? $this->activeAssignment?->employee;
     }
 
     public function getWarrantyStatusAttribute(): string

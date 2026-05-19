@@ -31,10 +31,14 @@ class AssignmentService
             $this->assertNoActiveAssignment($equipment);
             $this->assertSameSchool($equipment, $data);
 
+            // Accountable officer is now an equipment attribute. Keep the
+            // legacy employee_id populated (PAR/ICS PDF, exports still read it)
+            // by deriving it from the equipment officer when the form no
+            // longer supplies it. Expand/contract — column dropped in Phase 3.
             $assignment = EquipmentAssignment::query()->create([
                 'school_id' => $equipment->school_id,
                 'equipment_id' => $equipment->id,
-                'employee_id' => $data['employee_id'],
+                'employee_id' => $data['employee_id'] ?? $equipment->accountable_officer_id,
                 'custodian_id' => $data['custodian_id'] ?? null,
                 'assigned_by_id' => $actor->id,
                 'assigned_at' => $data['assigned_at'] ?? now()->toDateString(),
@@ -116,16 +120,20 @@ class AssignmentService
 
     private function assertSameSchool(Equipment $equipment, array $data): void
     {
-        if (! isset($data['employee_id'])) {
-            return;
-        }
+        // Validate whichever people are supplied (the form now sends a
+        // custodian; employee_id may still arrive via legacy callers/imports).
+        foreach (['employee_id' => 'Officer', 'custodian_id' => 'Custodian'] as $key => $role) {
+            if (empty($data[$key])) {
+                continue;
+            }
 
-        $employee = \App\Models\Employee::query()->whereKey($data['employee_id'])->first();
+            $person = \App\Models\Employee::query()->whereKey($data[$key])->first();
 
-        if ($employee && $employee->school_id !== $equipment->school_id) {
-            throw new RuntimeException(
-                "Employee and equipment belong to different schools (employee #{$employee->id}, equipment #{$equipment->id}).",
-            );
+            if ($person && $person->school_id !== $equipment->school_id) {
+                throw new RuntimeException(
+                    "{$role} and equipment belong to different schools (employee #{$person->id}, equipment #{$equipment->id}).",
+                );
+            }
         }
     }
 }

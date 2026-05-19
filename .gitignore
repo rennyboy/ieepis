@@ -41,3 +41,6 @@ storage/framework/views/*
 storage/logs/*
 !storage/logs/.gitkeep
 core.*
+
+# Local-only credential reference (app:export-test-users)
+/docs/TEST_USERS.md

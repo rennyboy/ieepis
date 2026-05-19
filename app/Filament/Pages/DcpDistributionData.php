@@ -18,21 +18,21 @@ class DcpDistributionData
                 'd.id',
                 'd.name',
                 // L4T / L4NT are DCP laptops classified by the employment_type of
-                // the person actually holding them: the custodian/end-user when
-                // set, else the accountable officer (COALESCE below). The teaching
-                // split lives on the employee, not the equipment row, so it can
-                // only come through the active assignment.
+                // the person responsible: the custodian/end-user when set, else
+                // the equipment's accountable officer (COALESCE below). The
+                // assignment is LEFT JOINed so items that have an accountable
+                // officer but no custodian assignment still classify.
                 DB::raw('(SELECT COUNT(*) FROM schools s
                     JOIN equipment e ON e.school_id = s.id AND e.is_dcp = true AND e.deleted_at IS NULL
-                    JOIN equipment_assignments ea ON ea.equipment_id = e.id AND ea.returned_at IS NULL AND ea.deleted_at IS NULL
-                    JOIN employees emp ON emp.id = COALESCE(ea.custodian_id, ea.employee_id) AND emp.deleted_at IS NULL
+                    LEFT JOIN equipment_assignments ea ON ea.equipment_id = e.id AND ea.returned_at IS NULL AND ea.deleted_at IS NULL
+                    JOIN employees emp ON emp.id = COALESCE(ea.custodian_id, e.accountable_officer_id) AND emp.deleted_at IS NULL
                     WHERE s.district_id = d.id AND s.deleted_at IS NULL
                     AND LOWER(e.equipment_type) = ? AND emp.employment_type = ?
                 ) as l4t'),
                 DB::raw('(SELECT COUNT(*) FROM schools s
                     JOIN equipment e ON e.school_id = s.id AND e.is_dcp = true AND e.deleted_at IS NULL
-                    JOIN equipment_assignments ea ON ea.equipment_id = e.id AND ea.returned_at IS NULL AND ea.deleted_at IS NULL
-                    JOIN employees emp ON emp.id = COALESCE(ea.custodian_id, ea.employee_id) AND emp.deleted_at IS NULL
+                    LEFT JOIN equipment_assignments ea ON ea.equipment_id = e.id AND ea.returned_at IS NULL AND ea.deleted_at IS NULL
+                    JOIN employees emp ON emp.id = COALESCE(ea.custodian_id, e.accountable_officer_id) AND emp.deleted_at IS NULL
                     WHERE s.district_id = d.id AND s.deleted_at IS NULL
                     AND LOWER(e.equipment_type) = ? AND emp.employment_type = ?
                 ) as l4nt'),
@@ -90,7 +90,7 @@ class DcpDistributionData
                     ->whereNull('ea.deleted_at');
             })
             ->leftJoin('employees as emp', function ($join) {
-                $join->on('emp.id', '=', DB::raw('COALESCE(ea.custodian_id, ea.employee_id)'))
+                $join->on('emp.id', '=', DB::raw('COALESCE(ea.custodian_id, e.accountable_officer_id)'))
                     ->whereNull('emp.deleted_at');
             })
             ->selectRaw('

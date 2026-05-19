@@ -49,7 +49,6 @@ class AssignmentResource extends Resource
                         ->live()
                         ->afterStateUpdated(function (Forms\Set $set): void {
                             $set('equipment_id', null);
-                            $set('employee_id', null);
                             $set('custodian_id', null);
                         })
                         ->required(),
@@ -78,24 +77,11 @@ class AssignmentResource extends Resource
                             ? 'Pick a school first'
                             : 'Select equipment')
                         ->disabledOn('edit'),
-                    Forms\Components\Select::make('employee_id')
-                        ->label('Accountable Officer')
-                        ->relationship(
-                            'employee',
-                            'full_name',
-                            fn (Builder $query, Forms\Get $get) => $query
-                                ->where('status', 'active')
-                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
-                        )
-                        ->searchable()
-                        ->preload()
-                        ->required()
-                        ->disabled(fn (Forms\Get $get) => blank($get('school_id')))
-                        ->placeholder(fn (Forms\Get $get) => blank($get('school_id'))
-                            ? 'Pick a school first'
-                            : 'Select officer'),
+                    // Accountable officer is set on the Equipment record
+                    // (Issuance tab), established at delivery — not here. An
+                    // assignment records the current custodian / end-user.
                     Forms\Components\Select::make('custodian_id')
-                        ->label('Custodian / End User (if different)')
+                        ->label('Custodian / End User')
                         ->relationship(
                             'custodian',
                             'full_name',
@@ -105,11 +91,12 @@ class AssignmentResource extends Resource
                         )
                         ->searchable()
                         ->preload()
+                        ->required()
+                        ->helperText('The person who physically holds/uses this item. The fiscally accountable officer is recorded on the equipment record.')
                         ->disabled(fn (Forms\Get $get) => blank($get('school_id')))
                         ->placeholder(fn (Forms\Get $get) => blank($get('school_id'))
                             ? 'Pick a school first'
-                            : 'Optional')
-                        ->nullable(),
+                            : 'Select custodian / end-user'),
                     Forms\Components\Select::make('transaction_type')
                         ->options(TransactionType::options())
                         ->required()
