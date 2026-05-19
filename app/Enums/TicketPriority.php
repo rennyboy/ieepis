@@ -28,6 +28,21 @@ enum TicketPriority: string
         };
     }
 
+    /**
+     * Severity weight for sorting (ascending = least to most urgent). Stored
+     * values sort alphabetically otherwise (critical, high, low, medium),
+     * which is not severity order.
+     */
+    public function sortOrder(): int
+    {
+        return match ($this) {
+            self::Low => 1,
+            self::Medium => 2,
+            self::High => 3,
+            self::Critical => 4,
+        };
+    }
+
     public static function options(): array
     {
         return collect(self::cases())

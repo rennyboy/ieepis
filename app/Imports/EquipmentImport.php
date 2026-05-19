@@ -2,17 +2,26 @@
 
 namespace App\Imports;
 
+use App\Enums\AccountabilityStatus;
+use App\Enums\TransactionType;
+use App\Models\Employee;
 use App\Models\Equipment;
+use App\Models\EquipmentAssignment;
 use App\Models\School;
+use App\Scopes\SchoolScope;
 use Maatwebsite\Excel\Concerns\ToModel;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithValidation;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsEmptyRows
 {
     private int $rowsImported = 0;
+
+    /** @var array<string, ?Employee> resolved-employee cache, keyed by the raw cell value */
+    private array $employeeCache = [];
 
     public function __construct(private ?int $schoolId = null) {}
 
@@ -66,14 +75,15 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
             'remarks' => $row['remarks'] ?? null,
         ];
 
-        $existing = Equipment::where('property_no', $row['property_no'])->first();
-        if ($existing) {
-            $existing->update($equipmentData);
+        $equipment = Equipment::updateOrCreate(
+            ['property_no' => $row['property_no']],
+            $equipmentData,
+        );
 
-            return null;
-        }
+        $this->syncAssignment($equipment, $row);
 
-        return new Equipment($equipmentData);
+        // Persisted manually so the assignment can be linked to the saved row.
+        return null;
     }
 
     public function rules(): array
@@ -128,6 +138,10 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
             'remarks' => [['remarks'], []],
             'non_dcp_flag' => [['non', 'dcp'], []],
             'non_functional_flag' => [['non', 'functional'], []],
+            'accountable_officer' => [['accountable', 'officer'], ['date', 'received', 'new']],
+            'custodian' => [['custodian'], ['date', 'received', 'new']],
+            'assignment_date' => [['date', 'accountable', 'officer'], ['new', 'custodian']],
+            'transaction_type' => [['transaction', 'type'], []],
         ];
 
         foreach ($aliases as $canonical => [$keywords, $exclude]) {
@@ -240,5 +254,100 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
             'unserviceable', 'broken', 'non-functional' => 'Unserviceable',
             default => 'Good',
         };
+    }
+
+    /**
+     * Link the equipment to its accountable officer (and custodian) as the
+     * single active assignment. Idempotent: re-importing the same row updates
+     * the existing open assignment instead of creating a duplicate.
+     */
+    private function syncAssignment(Equipment $equipment, array $row): void
+    {
+        $employee = $this->resolveEmployee($row['accountable_officer'] ?? null, $equipment->school_id);
+
+        if (! $employee) {
+            return;
+        }
+
+        $custodian = $this->resolveEmployee($row['custodian'] ?? null, $equipment->school_id);
+
+        $transactionType = TransactionType::tryFrom(trim((string) ($row['transaction_type'] ?? '')))
+            ?? TransactionType::BeginningInventory;
+
+        EquipmentAssignment::withoutGlobalScope(SchoolScope::class)->updateOrCreate(
+            ['equipment_id' => $equipment->id, 'returned_at' => null],
+            [
+                'school_id' => $equipment->school_id,
+                'employee_id' => $employee->id,
+                'custodian_id' => $custodian?->id,
+                'assigned_by_id' => Auth::id(),
+                'assigned_at' => $this->parseDate($row['assignment_date'] ?? null) ?? now()->toDateString(),
+                'transaction_type' => $transactionType,
+                'notes' => 'Imported from spreadsheet',
+            ],
+        );
+
+        if ($equipment->accountability_status !== AccountabilityStatus::Assigned) {
+            $equipment->forceFill(['accountability_status' => AccountabilityStatus::Assigned])->save();
+        }
+    }
+
+    /**
+     * Resolve an employee from an "Accountable Officer" / "Custodian" cell
+     * formatted as "LASTNAME, FIRSTNAME MIDDLE - EMPLOYEE_NUMBER".
+     *
+     * Tries the trailing employee number first (authoritative once real
+     * numbers are imported), then falls back to last + first name. Same-school
+     * matches are preferred. Results are cached for the import run.
+     */
+    private function resolveEmployee(?string $value, ?int $schoolId): ?Employee
+    {
+        $value = trim((string) ($value ?? ''));
+
+        if ($value === '') {
+            return null;
+        }
+
+        if (array_key_exists($value, $this->employeeCache)) {
+            return $this->employeeCache[$value];
+        }
+
+        $number = null;
+        $name = $value;
+        if (str_contains($value, ' - ')) {
+            $parts = explode(' - ', $value);
+            $number = trim((string) array_pop($parts));
+            $name = trim(implode(' - ', $parts));
+        }
+
+        $preferSchool = fn ($query) => $query->when(
+            $schoolId,
+            fn ($q) => $q->orderByRaw('CASE WHEN school_id = ? THEN 0 ELSE 1 END', [$schoolId]),
+        );
+
+        $employee = null;
+
+        if ($number !== null && $number !== '') {
+            $employee = Employee::withoutGlobalScope(SchoolScope::class)
+                ->where('employee_number', $number)
+                ->tap($preferSchool)
+                ->first();
+        }
+
+        if (! $employee && str_contains($name, ',')) {
+            [$last, $first] = array_pad(explode(',', $name, 2), 2, '');
+            $last = trim($last);
+            $first = explode(' ', trim($first))[0] ?? '';
+
+            if ($last !== '') {
+                $employee = Employee::withoutGlobalScope(SchoolScope::class)
+                    ->whereRaw('LOWER(last_name) = ?', [Str::lower($last)])
+                    ->when($first !== '', fn ($q) => $q->whereRaw('LOWER(first_name) LIKE ?', [Str::lower($first).'%']))
+                    ->tap($preferSchool)
+                    ->first();
+            }
+        }
+
+        return $this->employeeCache[$value] = $employee;
     }
 }

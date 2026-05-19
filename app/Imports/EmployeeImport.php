@@ -109,14 +109,23 @@ class EmployeeImport implements ToModel, WithHeadingRow, WithValidation, SkipsEm
         $existing = $base()->where('employee_number', $row['employee_number'])->first();
 
         if (! $existing && ! empty($row['first_name']) && ! empty($row['last_name'])) {
+            // Compare uppercased, not lowercased: names are already normalized
+            // to uppercase on import (and backfilled by commit 5df9718), so an
+            // uppercase-vs-uppercase match needs no SQL case-folding. This
+            // sidesteps Postgres LOWER()/UPPER() being locale-dependent for
+            // non-ASCII letters (e.g. Ñ in "BUSTALIÑO" does not fold under this
+            // DB's collation while PHP mb_* does — see pgsql case-sensitivity
+            // note). Str::upper on the param is mb-aware and idempotent here.
+            // TRIM the stored column too so a clean incoming name still
+            // reconciles against a legacy untrimmed record.
             $existing = $base()
-                ->whereRaw('LOWER(last_name) = ?', [Str::lower($row['last_name'])])
-                ->whereRaw('LOWER(first_name) = ?', [Str::lower($row['first_name'])])
+                ->whereRaw('TRIM(last_name) = ?', [Str::upper($row['last_name'])])
+                ->whereRaw('TRIM(first_name) = ?', [Str::upper($row['first_name'])])
                 ->when(
                     ! empty($row['middle_name']),
                     fn ($q) => $q->orderByRaw(
-                        'CASE WHEN LOWER(middle_name) = ? THEN 0 ELSE 1 END',
-                        [Str::lower($row['middle_name'])],
+                        'CASE WHEN TRIM(middle_name) = ? THEN 0 ELSE 1 END',
+                        [Str::upper($row['middle_name'])],
                     ),
                 )
                 ->first();
@@ -196,7 +205,16 @@ class EmployeeImport implements ToModel, WithHeadingRow, WithValidation, SkipsEm
         ];
         foreach ($stringFields as $f) {
             if (isset($row[$f]) && $row[$f] !== null && $row[$f] !== '') {
-                $row[$f] = (string) $row[$f];
+                // Collapse every run of Unicode whitespace — incl. NBSP (U+00A0),
+                // zero-width space (U+200B) and BOM (U+FEFF), all of which
+                // Excel/CSV exports routinely embed and which neither \s nor
+                // trim() strip — to one ASCII space, then trim. Without this a
+                // re-upload of "MA. CHARITY\u{A0}" fails the exact name match in
+                // findExisting() and spawns a numbered duplicate while the
+                // original AUTO- record is left behind.
+                $value = preg_replace('/[\s\p{Z}\x{200B}\x{FEFF}]+/u', ' ', (string) $row[$f]);
+                $value = trim((string) $value);
+                $row[$f] = $value === '' ? null : $value;
             }
         }
 

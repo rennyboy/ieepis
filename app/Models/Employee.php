@@ -161,4 +161,52 @@ class Employee extends Model
     {
         return $query->where("employment_type", "non-teaching");
     }
+
+    /**
+     * Synthetic employee-number prefixes. `AUTO-` is minted by EmployeeImport
+     * for rows with no employee number; `EMP-` by DatabaseSeeder for demo
+     * submitters. Neither is a real DepEd-issued number, so the UI must not
+     * present them as one.
+     */
+    public const PLACEHOLDER_NUMBER_PREFIXES = ['AUTO-', 'EMP-'];
+
+    public function hasRealEmployeeNumber(): bool
+    {
+        $number = (string) $this->employee_number;
+
+        if ($number === '') {
+            return false;
+        }
+
+        foreach (self::PLACEHOLDER_NUMBER_PREFIXES as $prefix) {
+            if (str_starts_with($number, $prefix)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** Employees still awaiting a real employee number (placeholder/blank). */
+    public function scopePendingEmployeeNumber($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('employee_number')->orWhere('employee_number', '');
+            foreach (self::PLACEHOLDER_NUMBER_PREFIXES as $prefix) {
+                $q->orWhere('employee_number', 'like', $prefix.'%');
+            }
+        });
+    }
+
+    /** Employees with a real, DepEd-issued employee number. */
+    public function scopeHasEmployeeNumber($query)
+    {
+        return $query->whereNotNull('employee_number')
+            ->where('employee_number', '!=', '')
+            ->where(function ($q) {
+                foreach (self::PLACEHOLDER_NUMBER_PREFIXES as $prefix) {
+                    $q->where('employee_number', 'not like', $prefix.'%');
+                }
+            });
+    }
 }

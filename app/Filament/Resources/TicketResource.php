@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\TicketResource\Pages;
+use App\Models\Equipment;
 use App\Models\Ticket;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -43,7 +44,13 @@ class TicketResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $count = static::getModel()::whereIn('status', ['open', 'in-progress'])
+        // Reuse the scoped query so the badge respects the school-admin
+        // restriction in getEloquentQuery() instead of counting every school.
+        $count = static::getEloquentQuery()
+            ->whereIn('status', [
+                TicketStatus::Open->value,
+                TicketStatus::InProgress->value,
+            ])
             ->count();
 
         return $count > 0 ? (string) $count : null;
@@ -66,13 +73,29 @@ class TicketResource extends Resource
                         ->required(),
                     Forms\Components\Select::make('equipment_id')
                         ->label('Related Equipment')
-                        ->relationship('equipment', 'model')
-                        ->searchable()
+                        ->relationship(
+                            'equipment',
+                            'model',
+                            fn (Builder $query, Forms\Get $get) => $query
+                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
+                        )
+                        ->getOptionLabelFromRecordUsing(
+                            fn (Equipment $record): string => trim("{$record->brand} {$record->model}")." ({$record->property_no})",
+                        )
+                        ->searchable(['brand', 'model', 'property_no', 'serial_number'])
+                        ->preload()
+                        ->placeholder('Search by property no, serial, brand or model')
                         ->nullable(),
                     Forms\Components\Select::make('reporter_id')
                         ->label('Reported By')
-                        ->relationship('reporter', 'full_name')
+                        ->relationship(
+                            'reporter',
+                            'full_name',
+                            fn (Builder $query, Forms\Get $get) => $query
+                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
+                        )
                         ->searchable()
+                        ->preload()
                         ->required(),
                     Forms\Components\TextInput::make('issue_title')
                         ->label('Issue Title')
@@ -96,8 +119,14 @@ class TicketResource extends Resource
                         ->default(TicketStatus::Open),
                     Forms\Components\Select::make('assigned_to_id')
                         ->label('Assigned Technician')
-                        ->relationship('assignedTo', 'full_name')
+                        ->relationship(
+                            'assignedTo',
+                            'full_name',
+                            fn (Builder $query, Forms\Get $get) => $query
+                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
+                        )
                         ->searchable()
+                        ->preload()
                         ->nullable(),
                     Forms\Components\DateTimePicker::make('resolved_at')->label(
                         'Resolved At',
@@ -135,7 +164,16 @@ class TicketResource extends Resource
                 Tables\Columns\TextColumn::make('priority')
                     ->badge()
                     ->formatStateUsing(fn (TicketPriority $state): string => $state->label())
-                    ->color(fn (TicketPriority $state): string => $state->color()),
+                    ->color(fn (TicketPriority $state): string => $state->color())
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        $direction = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+                        $cases = collect(TicketPriority::cases());
+
+                        return $query->orderByRaw(
+                            'CASE priority'.$cases->map(fn () => ' WHEN ? THEN ?')->implode('').' END '.$direction,
+                            $cases->flatMap(fn (TicketPriority $p) => [$p->value, $p->sortOrder()])->all(),
+                        );
+                    }),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn (TicketStatus $state): string => $state->label())

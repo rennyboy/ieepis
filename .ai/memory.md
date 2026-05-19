@@ -6,6 +6,7 @@
 - `Stack` — exact framework/package versions
 - `Domain Rules` — DepEd-specific invariants
 - `Modules` — split into [`memory-modules.md`](memory-modules.md); load on demand
+- `Docker` — hybrid dev workflow in [`memory-docker.md`](memory-docker.md); load when touching env/compose
 - `Priorities` — current focus
 - `Constraints` — hard limits and gotchas
 
@@ -23,7 +24,7 @@ Track ICT equipment inventory, accountability/assignment history (PAR, ICS, RRSP
 ## Stack
 - PHP 8.4, Laravel 11, FilamentPHP v3, Livewire v3, Tailwind v3
 - Database: PostgreSQL 14+ or MySQL 8.0+ — keep DB-agnostic (Schema builder, no driver-specific SQL)
-- **Local dev (no Docker)** — run `php artisan ...`, `php -S`, `composer ...`, `npm ...` directly. Sail is no longer used (CPU-saving, see Decision 014). `docker-compose.yml` and `docker/` stay in repo for reference but aren't invoked.
+- **Local dev (Docker hybrid)** — runtime stack (nginx/php-fpm/postgres/redis) runs in Docker via `docker compose up -d`; `php artisan`, `composer`, `npm`, `psql` still run directly on the host (never via Sail — see Decision 014/015). Host artisan reaches the Docker Postgres via published port `5432`. See `memory-docker.md`.
 - Spatie Permission, Spatie ActivityLog, PHPUnit 11 (NOT Pest)
 - Laravel Boost MCP: `search-docs`, `database-query`, `database-schema`, `browser-logs`
 
@@ -46,4 +47,5 @@ For full Laravel/Filament conventions see `.ai/laravel-boost.md`.
 3. Reporting / DCP dashboard
 
 ## Constraints
-- No framework upgrades without approval. App is stateless HTTP only. No business logic in controllers — use service classes. **Run commands locally — never via Sail/Docker** (Decision 014 supersedes 006).
+
+- No framework upgrades without approval. App is stateless HTTP only. No business logic in controllers — use service classes. **Run `artisan`/`composer`/`npm` directly on the host — never via `vendor/bin/sail`** (Decision 014; clarified by 015 — Docker is fine for the runtime stack).
