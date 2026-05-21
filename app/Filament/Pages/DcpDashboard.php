@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use Filament\Actions\Action;
 use Filament\Pages\Page;
 use App\Filament\Widgets\DcpStatsOverview;
 use App\Filament\Widgets\DcpDistributionChart;
@@ -24,6 +25,17 @@ class DcpDashboard extends Page
     protected static ?int $navigationSort = 2;
 
     protected static string $view = "filament.pages.dcp-dashboard";
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('exportPdf')
+                ->label('Export PDF')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('success')
+                ->url(fn (): string => route('dcp.pdf.export'), shouldOpenInNewTab: true),
+        ];
+    }
 
     protected function getHeaderWidgets(): array
     {

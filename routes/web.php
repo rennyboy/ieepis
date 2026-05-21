@@ -5,6 +5,7 @@ use App\Http\Controllers\EmployeeExcelController;
 use App\Http\Controllers\EmployeePdfController;
 use App\Http\Controllers\EquipmentExcelController;
 use App\Http\Controllers\EquipmentPdfController;
+use App\Http\Controllers\DcpPdfController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -27,6 +28,9 @@ Route::middleware(['auth', 'role:super-admin|sdo-admin|school-admin'])->group(fu
     Route::get('equipment/pdf/bulk', [EquipmentPdfController::class, 'generateBulkPdf'])
         ->name('equipment.pdf.bulk');
 
+    Route::get('dcp/pdf/export', [DcpPdfController::class, 'export'])
+        ->name('dcp.pdf.export');
+
     Route::get('equipment/excel/export', [EquipmentExcelController::class, 'export'])
         ->name('equipment.excel.export');
 
@@ -35,6 +39,9 @@ Route::middleware(['auth', 'role:super-admin|sdo-admin|school-admin'])->group(fu
 
     Route::post('equipment/excel/import', [EquipmentExcelController::class, 'import'])
         ->name('equipment.excel.import');
+
+    Route::get('equipment/excel/unresolved/{filename}', [EquipmentExcelController::class, 'downloadUnresolved'])
+        ->name('equipment.excel.unresolved');
 
     Route::get('employees/excel/export', [EmployeeExcelController::class, 'export'])
         ->name('employees.excel.export');

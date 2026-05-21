@@ -20,6 +20,16 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
 {
     private int $rowsImported = 0;
 
+    private int $officerResolvedCount = 0;
+
+    private int $custodianResolvedCount = 0;
+
+    /** @var array<string, true> set of distinct unresolved officer cell values */
+    private array $officerUnresolved = [];
+
+    /** @var array<string, true> set of distinct unresolved custodian cell values */
+    private array $custodianUnresolved = [];
+
     /** @var array<string, ?Employee> resolved-employee cache, keyed by the raw cell value */
     private array $employeeCache = [];
 
@@ -28,6 +38,30 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
     public function getRowCount(): int
     {
         return $this->rowsImported;
+    }
+
+    /**
+     * Summary of officer/custodian resolution outcomes for the import run.
+     * Used by the controller to render a Filament notification and (when
+     * unresolved names exist) generate a downloadable CSV of names to seed.
+     *
+     * @return array{
+     *     rows: int,
+     *     officer_resolved: int,
+     *     custodian_resolved: int,
+     *     officer_unresolved: list<string>,
+     *     custodian_unresolved: list<string>,
+     * }
+     */
+    public function getResolutionSummary(): array
+    {
+        return [
+            'rows' => $this->rowsImported,
+            'officer_resolved' => $this->officerResolvedCount,
+            'custodian_resolved' => $this->custodianResolvedCount,
+            'officer_unresolved' => array_keys($this->officerUnresolved),
+            'custodian_unresolved' => array_keys($this->custodianUnresolved),
+        ];
     }
 
     public function model(array $row)
@@ -64,7 +98,7 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
             'dcp_year' => $row['dcp_year'] ?? null,
             'condition' => $this->mapCondition($row['condition'] ?? null),
             'is_functional' => $this->parseInverseFlag($row['non_functional_flag'] ?? null),
-            'accountability_status' => $row['accountability_status'] ?? 'unassigned',
+            'accountability_status' => $this->mapAccountabilityStatus($row['accountability_status'] ?? null),
             'acquisition_cost' => $row['acquisition_cost'] ?? null,
             'acquisition_date' => $this->parseDate($row['acquisition_date'] ?? null),
             'mode_of_acquisition' => $row['mode_of_acquisition'] ?? null,
@@ -154,6 +188,22 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
             }
         }
 
+        // DepEd ICT inventory sheets use `end_user` instead of `custodian` and
+        // `date_assigned_end_user` for the same role; map both onto the canonicals
+        // that syncAssignment() already understands.
+        if (empty($row['custodian'])) {
+            $endUser = $this->fuzzyGet($row, ['end', 'user'], ['date', 'received']);
+            if ($endUser !== null && $endUser !== '') {
+                $row['custodian'] = $endUser;
+            }
+        }
+
+        $endUserDate = $this->fuzzyGet($row, ['date', 'assigned', 'end', 'user'], []);
+        if ($endUserDate !== null && $endUserDate !== '') {
+            // EquipmentAssignment.assigned_at is the custodian-assignment date.
+            $row['assignment_date'] = $endUserDate;
+        }
+
         if (empty($row['property_no']) && ! empty($row['serial_number'])) {
             $row['property_no'] = $row['serial_number'];
         }
@@ -239,6 +289,29 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
         };
     }
 
+    /**
+     * Match either an AccountabilityStatus backing value (e.g. "unassigned",
+     * "For Disposal") or a human label (e.g. "Unassigned", "Damaged due to
+     * calamity") — case-insensitive — so exports re-import cleanly even when
+     * users edit the human-readable label.
+     */
+    private function mapAccountabilityStatus(?string $value): string
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return AccountabilityStatus::Unassigned->value;
+        }
+
+        $needle = strtolower(trim((string) $value));
+
+        foreach (AccountabilityStatus::cases() as $case) {
+            if (strtolower($case->value) === $needle || strtolower($case->label()) === $needle) {
+                return $case->value;
+            }
+        }
+
+        return AccountabilityStatus::Unassigned->value;
+    }
+
     private function mapCondition(?string $value): string
     {
         if ($value === null || $value === '') {
@@ -265,13 +338,26 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
      */
     private function syncAssignment(Equipment $equipment, array $row): void
     {
-        $officer = $this->resolveEmployee($row['accountable_officer'] ?? null, $equipment->school_id);
+        $officerRaw = trim((string) ($row['accountable_officer'] ?? ''));
+        $officer = $this->resolveEmployee($officerRaw, $equipment->school_id);
 
-        if ($officer && $equipment->accountable_officer_id !== $officer->id) {
-            $equipment->forceFill(['accountable_officer_id' => $officer->id])->save();
+        if ($officer) {
+            $this->officerResolvedCount++;
+            if ($equipment->accountable_officer_id !== $officer->id) {
+                $equipment->forceFill(['accountable_officer_id' => $officer->id])->save();
+            }
+        } elseif ($officerRaw !== '') {
+            $this->officerUnresolved[$officerRaw] = true;
         }
 
-        $custodian = $this->resolveEmployee($row['custodian'] ?? null, $equipment->school_id);
+        $custodianRaw = trim((string) ($row['custodian'] ?? ''));
+        $custodian = $this->resolveEmployee($custodianRaw, $equipment->school_id);
+
+        if ($custodian) {
+            $this->custodianResolvedCount++;
+        } elseif ($custodianRaw !== '') {
+            $this->custodianUnresolved[$custodianRaw] = true;
+        }
 
         // No custodian → nothing to assign; the item still has its officer.
         if (! $custodian) {
@@ -356,6 +442,28 @@ class EquipmentImport implements ToModel, WithHeadingRow, WithValidation, SkipsE
                 $employee = Employee::withoutGlobalScope(SchoolScope::class)
                     ->whereRaw('LOWER(last_name) = ?', [Str::lower($last)])
                     ->when($first !== '', fn ($q) => $q->whereRaw('LOWER(first_name) LIKE ?', [Str::lower($first).'%']))
+                    ->tap($preferSchool)
+                    ->first();
+            }
+        }
+
+        // Natural "FIRST [M.] LAST" form (DepEd sheets): drop middle-initial
+        // tokens like "B." or "MA.", then take first token as first_name and
+        // last token as last_name.
+        if (! $employee && ! str_contains($name, ',') && $name !== '') {
+            $tokens = preg_split('/\s+/', $name) ?: [];
+            $tokens = array_values(array_filter(
+                $tokens,
+                fn ($t) => $t !== '' && ! preg_match('/^[A-Z]{1,3}\.$/u', $t),
+            ));
+
+            if (count($tokens) >= 2) {
+                $first = $tokens[0];
+                $last = end($tokens);
+
+                $employee = Employee::withoutGlobalScope(SchoolScope::class)
+                    ->whereRaw('LOWER(last_name) = ?', [Str::lower($last)])
+                    ->whereRaw('LOWER(first_name) LIKE ?', [Str::lower($first).'%'])
                     ->tap($preferSchool)
                     ->first();
             }

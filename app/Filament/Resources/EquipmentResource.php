@@ -519,7 +519,7 @@ class EquipmentResource extends Resource
                         try {
                             $import = new \App\Imports\EquipmentImport((int) $data['target_school_id']);
                             Excel::import($import, $data['file'], 'public');
-                            
+
                             if ($import->getRowCount() === 0) {
                                 Notification::make()
                                     ->warning()
@@ -529,12 +529,10 @@ class EquipmentResource extends Resource
                                 return;
                             }
 
-                            Notification::make()
-                                ->success()
-                                ->title('Import Successful')
-                                ->body($import->getRowCount() . ' equipment records have been imported or updated.')
-                                ->send();
-                        } catch (\Exception $e) {
+                            $summary = $import->getResolutionSummary();
+                            $reportFilename = \App\Http\Controllers\EquipmentExcelController::storeUnresolvedReport($summary);
+                            \App\Http\Controllers\EquipmentExcelController::notifyImportResult($summary, $reportFilename);
+                        } catch (\Throwable $e) {
                             Notification::make()
                                 ->danger()
                                 ->title('Import Failed')

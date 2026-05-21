@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Models\Employee;
 use App\Models\Equipment;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -11,7 +12,7 @@ class EquipmentExport implements FromCollection, WithHeadings, WithMapping
 {
     public function collection()
     {
-        return Equipment::with(['school', 'activeAssignment.employee'])
+        return Equipment::with(['school', 'accountableOfficer', 'activeAssignment.employee'])
             ->orderBy('property_no')
             ->get();
     }
@@ -35,6 +36,7 @@ class EquipmentExport implements FromCollection, WithHeadings, WithMapping
             'Is Functional',
             'Accountability Status',
             'School',
+            'Accountable Officer',
             'Current Assignee',
             'Acquisition Cost',
             'Acquisition Date',
@@ -63,10 +65,11 @@ class EquipmentExport implements FromCollection, WithHeadings, WithMapping
             $equipment->is_dcp ? 'Yes' : 'No',
             $equipment->dcp_package,
             $equipment->dcp_year,
-            $equipment->condition,
+            $equipment->condition?->label(),
             $equipment->is_functional ? 'Yes' : 'No',
-            $equipment->accountability_status,
+            $equipment->accountability_status?->label(),
             $equipment->school?->name,
+            $this->formatEmployeeRef($equipment->accountableOfficer),
             $equipment->activeAssignment?->employee?->full_name,
             $equipment->acquisition_cost,
             $equipment->acquisition_date?->format('Y-m-d'),
@@ -78,5 +81,18 @@ class EquipmentExport implements FromCollection, WithHeadings, WithMapping
             $equipment->remarks,
             $equipment->created_at?->format('Y-m-d H:i:s'),
         ];
+    }
+
+    private function formatEmployeeRef(?Employee $employee): ?string
+    {
+        if (! $employee) {
+            return null;
+        }
+
+        $number = trim((string) $employee->employee_number);
+
+        return $number === ''
+            ? $employee->full_name
+            : "{$employee->full_name} - {$number}";
     }
 }
