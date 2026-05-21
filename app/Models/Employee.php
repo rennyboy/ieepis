@@ -10,14 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
-use App\Enums\EmployeeStatus;
 
 class Employee extends Model
 {
     use HasFactory, SoftDeletes, LogsActivity;
 
     protected $fillable = [
-        "user_id",
         "school_id",
         "employee_number",
         "first_name",
@@ -54,17 +52,11 @@ class Employee extends Model
         "is_oic" => "boolean",
         "is_non_deped_funded" => "boolean",
         "is_inactive" => "boolean",
-        "status" => EmployeeStatus::class,
     ];
 
     public function getActivitylogOptions(): LogOptions
     {
-        // PII columns are logged in `activity_log.properties` JSON if not excluded.
-        // A breach of activity_log would expose change history of personal info.
-        return LogOptions::defaults()
-            ->logAll()
-            ->logOnlyDirty()
-            ->logExcept(['personal_email', 'mobile_1', 'mobile_2']);
+        return LogOptions::defaults()->logAll()->logOnlyDirty();
     }
 
     protected static function booted(): void
@@ -92,14 +84,6 @@ class Employee extends Model
     public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);
-    }
-
-    /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\User, self>
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
     }
 
     /**
@@ -139,12 +123,17 @@ class Employee extends Model
      */
     public function documents(): HasMany
     {
-        return $this->hasMany(Document::class, "employee_id");
+        return $this->hasMany(Document::class, "uploaded_by_id");
     }
 
     public function getDisplayNameAttribute(): string
     {
         return "{$this->full_name} ({$this->employee_number})";
+    }
+
+    public function getCurrentEquipmentCountAttribute(): int
+    {
+        return $this->activeAssignments()->count();
     }
 
     public function scopeActive($query)
@@ -160,53 +149,5 @@ class Employee extends Model
     public function scopeNonTeaching($query)
     {
         return $query->where("employment_type", "non-teaching");
-    }
-
-    /**
-     * Synthetic employee-number prefixes. `AUTO-` is minted by EmployeeImport
-     * for rows with no employee number; `EMP-` by DatabaseSeeder for demo
-     * submitters. Neither is a real DepEd-issued number, so the UI must not
-     * present them as one.
-     */
-    public const PLACEHOLDER_NUMBER_PREFIXES = ['AUTO-', 'EMP-'];
-
-    public function hasRealEmployeeNumber(): bool
-    {
-        $number = (string) $this->employee_number;
-
-        if ($number === '') {
-            return false;
-        }
-
-        foreach (self::PLACEHOLDER_NUMBER_PREFIXES as $prefix) {
-            if (str_starts_with($number, $prefix)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /** Employees still awaiting a real employee number (placeholder/blank). */
-    public function scopePendingEmployeeNumber($query)
-    {
-        return $query->where(function ($q) {
-            $q->whereNull('employee_number')->orWhere('employee_number', '');
-            foreach (self::PLACEHOLDER_NUMBER_PREFIXES as $prefix) {
-                $q->orWhere('employee_number', 'like', $prefix.'%');
-            }
-        });
-    }
-
-    /** Employees with a real, DepEd-issued employee number. */
-    public function scopeHasEmployeeNumber($query)
-    {
-        return $query->whereNotNull('employee_number')
-            ->where('employee_number', '!=', '')
-            ->where(function ($q) {
-                foreach (self::PLACEHOLDER_NUMBER_PREFIXES as $prefix) {
-                    $q->where('employee_number', 'not like', $prefix.'%');
-                }
-            });
     }
 }

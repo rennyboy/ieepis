@@ -33,8 +33,10 @@ class ApprovedUser extends Model
 
     protected $fillable = [
         'email',
+        'name',
         'role',
-        'school_id',
+        'division',
+        'division_id',
         'status',
         'approved_by',
         'actioned_at',
@@ -58,10 +60,5 @@ class ApprovedUser extends Model
     public function actionedBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
-    }
-
-    public function school(): \Illuminate\Database\Eloquent\Relations\BelongsTo
-    {
-        return $this->belongsTo(School::class);
     }
 }

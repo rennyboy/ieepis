@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApprovedUser;
-use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 use Exception;
@@ -23,16 +22,7 @@ class GoogleController extends Controller
     {
         try {
             $googleUser = Socialite::driver('google')->user();
-
-            // Reject unverified Google accounts. Without this, an attacker could
-            // register a Google account with an unverified email matching real
-            // staff and slide into the approval queue.
-            $verified = (bool) ($googleUser->user['email_verified'] ?? $googleUser->getRaw()['email_verified'] ?? false);
-            if (! $verified) {
-                return redirect()->route('filament.admin.auth.login')
-                    ->withErrors(['email' => 'Your Google account email is not verified. Please verify it with Google before signing in.']);
-            }
-
+            
             // 1. Check if user already exists by Google ID
             $existingUser = User::where('google_id', $googleUser->id)->first();
             
@@ -57,7 +47,7 @@ class GoogleController extends Controller
                 // Self-registration via Google - add to whitelist as pending
                 ApprovedUser::create([
                     'email' => $googleUser->email,
-                    'name' => $googleUser->name ?: $googleUser->email,
+                    'name' => $googleUser->name,
                     'status' => 'pending',
                 ]);
 
@@ -77,26 +67,14 @@ class GoogleController extends Controller
 
             // 4. Create new user from Google Data (Status is Approved)
             $newUser = User::create([
+                'name' => $googleUser->name,
                 'email' => $googleUser->email,
                 'google_id' => $googleUser->id,
                 'password' => Hash::make(Str::random(24)),
                 'approval_status' => 'approved',
+                'division' => $approvedUser->division,
+                'division_id' => $approvedUser->division_id,
             ]);
-
-            // Link to existing Employee record (if one matches by email) so
-            // delegated $user->name / $user->school_id resolve immediately.
-            $employee = Employee::query()
-                ->whereNull('user_id')
-                ->where('email', $googleUser->email)
-                ->first();
-
-            if ($employee) {
-                $employee->update([
-                    'user_id' => $newUser->id,
-                    'full_name' => $googleUser->name ?? $employee->full_name,
-                    'first_name' => $googleUser->name ?? $employee->first_name,
-                ]);
-            }
 
             if ($approvedUser->role) {
                 $newUser->assignRole($approvedUser->role);

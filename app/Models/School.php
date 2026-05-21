@@ -59,6 +59,8 @@ use Spatie\Activitylog\LogOptions;
  * @property \Carbon\Carbon|null $deleted_at
  *
  * @property-read string $full_address
+ * @property-read int $equipment_count
+ * @property-read int $assigned_equipment_count
  *
  * @method static Builder|static active() Scope to only active schools
  * @method static Builder|static query()
@@ -198,4 +200,15 @@ class School extends Model
         );
     }
 
+    public function getEquipmentCountAttribute(): int
+    {
+        return $this->equipment()->count();
+    }
+
+    public function getAssignedEquipmentCountAttribute(): int
+    {
+        return $this->equipment()
+            ->where("accountability_status", "assigned")
+            ->count();
+    }
 }

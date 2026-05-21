@@ -3,70 +3,55 @@ set -e
 
 echo "Starting Laravel application initialization..."
 
+# Function to check if MySQL is ready
 wait_for_db() {
     local host=$1
     local port=$2
     local user=$3
-    local db=$4
+    local password=$4
 
-    echo "Waiting for PostgreSQL at $host:$port..."
+    echo "Waiting for MySQL at $host:$port..."
 
-    for i in $(seq 1 30); do
-        if pg_isready -h "$host" -p "$port" -U "$user" -d "$db" >/dev/null 2>&1; then
-            echo "PostgreSQL is ready!"
+    for i in {1..30}; do
+        if mysqladmin ping -h"$host" -u"$user" -p"$password" --silent 2>/dev/null; then
+            echo "MySQL is ready!"
             return 0
         fi
-        echo "Attempt $i/30: PostgreSQL not ready yet, waiting..."
+        echo "Attempt $i/30: MySQL not ready yet, waiting..."
         sleep 1
     done
 
-    echo "PostgreSQL failed to start within timeout"
+    echo "MySQL failed to start within timeout"
     return 1
 }
 
-wait_for_db "${DB_HOST}" "${DB_PORT}" "${DB_USERNAME}" "${DB_DATABASE}"
+# Wait for database to be ready
+wait_for_db "${DB_HOST}" "${DB_PORT}" "${DB_USERNAME}" "${DB_PASSWORD}"
 
-# Only the primary php-fpm container runs migrations + caches.
-# Worker and scheduler reuse the same image but skip these steps.
-if [ "$1" = "php-fpm" ]; then
-    echo "Clearing application cache..."
-    php artisan config:clear || true
-    php artisan cache:clear || true
-    php artisan view:clear || true
-    php artisan route:clear || true
-    php -r 'opcache_reset();' 2>/dev/null || true
+# Clear existing caches
+echo "Clearing application cache..."
+php artisan config:clear 2>/dev/null || true
+php artisan cache:clear 2>/dev/null || true
+php artisan view:clear 2>/dev/null || true
 
-    echo "Resetting Spatie permission cache..."
-    php artisan permission:cache-reset || true
+# Run migrations
+echo "Running database migrations..."
+php artisan migrate --force 2>/dev/null || {
+    echo "Migration warning, continuing..."
+}
 
-    echo "Running database migrations..."
-    php artisan migrate --force || {
-        echo "Migration failed!"
-        exit 1
-    }
+# Optimize application for production
+echo "Optimizing application..."
+php artisan config:cache 2>/dev/null || true
+php artisan route:cache 2>/dev/null || true
+php artisan view:cache 2>/dev/null || true
 
-    echo "Linking public storage..."
-    php artisan storage:link --force || true
+# Set proper permissions
+echo "Setting permissions..."
+chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true
+chmod -R 775 /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true
 
-    if [ "$APP_ENV" != "local" ]; then
-        echo "Optimizing application..."
-        php artisan config:cache || true
-        php artisan route:cache || true
-        php artisan view:cache || true
-        php artisan event:cache || true
+echo "Laravel initialization complete. Starting application services..."
 
-        echo "Caching Filament components..."
-        php artisan filament:cache-components || true
-        php artisan icons:cache || true
-    else
-        echo "APP_ENV=local — skipping config/route/view/event/filament/icons cache (avoids stale-cache headaches with bind-mounted source)."
-    fi
-
-    echo "Setting permissions..."
-    chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true
-    chmod -R 775 /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true
-fi
-
-echo "Laravel initialization complete. Starting: $*"
-
-exec "$@"
+# Start supervisord to manage Nginx and PHP-FPM
+exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

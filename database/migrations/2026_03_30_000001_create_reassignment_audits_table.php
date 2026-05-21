@@ -32,13 +32,10 @@ return new class () extends Migration {
         Schema::create('reassignment_audits', function (Blueprint $table): void {
             $table->id();
 
-            // The user whose account was reassigned. nullOnDelete so the audit
-            // record survives even after the user is removed — defeats the
-            // purpose of an audit table if it cascades.
+            // The user whose account was reassigned
             $table->foreignId('user_id')
-                ->nullable()
                 ->constrained('users')
-                ->nullOnDelete();
+                ->cascadeOnDelete();
 
             // The admin/user who performed the reassignment (nullable)
             $table->foreignId('actor_id')

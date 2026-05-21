@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\EquipmentResource\RelationManagers;
 
-use App\Enums\DocumentType;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -18,7 +17,7 @@ class DocumentsRelationManager extends RelationManager
     {
         return $form->schema([
             Forms\Components\Select::make('document_type')
-                ->options(DocumentType::options())
+                ->options(['PAR' => 'PAR', 'ICS' => 'ICS', 'IAR' => 'IAR', 'DR' => 'DR', 'OR' => 'OR', 'SI' => 'SI', 'WMR' => 'WMR', 'RRSP' => 'RRSP', 'Other' => 'Other'])
                 ->required(),
             Forms\Components\TextInput::make('document_no'),
             Forms\Components\DatePicker::make('document_date'),
@@ -34,36 +33,22 @@ class DocumentsRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('title')
-            ->description('Upload paperwork (PAR, ICS, IAR, etc.) here. Use "Link to Existing" toggle to link documents.')
             ->columns([
-                Tables\Columns\TextColumn::make('document_type')
-                    ->label('Type')
-                    ->badge()
-                    ->color('info'),
-                Tables\Columns\TextColumn::make('title')
-                    ->weight('bold')
-                    ->limit(40),
-                Tables\Columns\TextColumn::make('document_no')
-                    ->label('Doc No.')
-                    ->fontFamily('mono'),
-                Tables\Columns\TextColumn::make('document_date')
-                    ->date()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Added')
-                    ->since(),
+                Tables\Columns\TextColumn::make('document_type')->badge()->color('info'),
+                Tables\Columns\TextColumn::make('document_no'),
+                Tables\Columns\TextColumn::make('title')->weight('bold')->limit(40),
+                Tables\Columns\TextColumn::make('document_date')->date()->sortable(),
+                Tables\Columns\TextColumn::make('created_at')->label('Uploaded')->since(),
             ])
             ->headerActions([Tables\Actions\CreateAction::make()])
             ->actions([
                 Tables\Actions\Action::make('view_file')
-                    ->label('View')
+                    ->label('View File')
                     ->icon('heroicon-o-eye')
-                    ->visible(fn ($record) => !empty($record->file_path))
                     ->url(fn ($record) => asset('storage/' . $record->file_path))
                     ->openUrlInNewTab(),
                 Tables\Actions\Action::make('download')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->visible(fn ($record) => !empty($record->file_path))
                     ->url(fn ($record) => asset('storage/' . $record->file_path))
                     ->openUrlInNewTab(),
                 Tables\Actions\DeleteAction::make(),

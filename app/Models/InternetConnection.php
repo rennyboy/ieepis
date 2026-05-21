@@ -2,19 +2,12 @@
 
 namespace App\Models;
 
-use App\Scopes\SchoolScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InternetConnection extends Model
 {
     use HasFactory;
-
-    protected static function booted(): void
-    {
-        static::addGlobalScope(new SchoolScope());
-    }
 
     protected $fillable = [
         'school_id',
@@ -48,7 +41,7 @@ class InternetConnection extends Model
         'subscription_end'          => 'date',
     ];
 
-    public function school(): BelongsTo
+    public function school()
     {
         return $this->belongsTo(School::class);
     }

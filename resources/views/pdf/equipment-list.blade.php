@@ -45,8 +45,8 @@
                     <td>{{ $item->serial_number }}</td>
                     <td>{{ $item->school?->name }}</td>
                     <td>{{ $item->activeAssignment?->employee?->full_name ?? 'None' }}</td>
-                    <td>{{ $item->condition?->label() }}</td>
-                    <td>{{ $item->accountability_status?->label() }}</td>
+                    <td>{{ $item->condition }}</td>
+                    <td>{{ ucfirst($item->accountability_status) }}</td>
                 </tr>
                 @endforeach
             </tbody>

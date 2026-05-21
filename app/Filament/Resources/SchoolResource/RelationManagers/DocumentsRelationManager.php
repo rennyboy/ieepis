@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\SchoolResource\RelationManagers;
 
-use App\Enums\DocumentType;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -18,7 +17,7 @@ class DocumentsRelationManager extends RelationManager
     {
         return $form->schema([
             Forms\Components\Select::make('document_type')
-                ->options(DocumentType::options())
+                ->options(['PAR' => 'PAR', 'ICS' => 'ICS', 'IAR' => 'IAR', 'DR' => 'DR', 'OR' => 'OR', 'SI' => 'SI', 'WMR' => 'WMR', 'RRSP' => 'RRSP', 'Other' => 'Other'])
                 ->required(),
             Forms\Components\TextInput::make('document_no'),
             Forms\Components\DatePicker::make('document_date'),

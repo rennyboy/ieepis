@@ -2,18 +2,15 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\TransactionType;
 use App\Filament\Resources\AssignmentResource\Pages;
 use App\Models\Equipment;
 use App\Models\EquipmentAssignment;
-use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
 class AssignmentResource extends Resource
@@ -36,71 +33,70 @@ class AssignmentResource extends Resource
                     Forms\Components\Select::make('school_id')
                         ->label('School')
                         ->relationship('school', 'name')
-                        ->disabled(function () {
+                        ->disabled(
+                            function () {
+                                /** @var \App\Models\User $user */
+                                $user = Auth::user();
+
+                                return ! $user->hasRole('super-admin');
+                            },
+                        )
+                        ->default(function () {
                             /** @var \App\Models\User $user */
                             $user = Auth::user();
 
-                            return ! $user->hasRole('super-admin');
+                            return $user->school_id;
                         })
-                        ->default(fn () => Auth::user()?->school_id)
-                        ->dehydrated()
                         ->searchable()
                         ->preload()
-                        ->live()
-                        ->afterStateUpdated(function (Forms\Set $set): void {
-                            $set('equipment_id', null);
-                            $set('custodian_id', null);
-                        })
                         ->required(),
                     Forms\Components\Select::make('equipment_id')
                         ->label('Equipment')
                         ->relationship(
                             'equipment',
                             'model',
-                            fn (Builder $query, Forms\Get $get, ?EquipmentAssignment $record) => $query
-                                ->where(function (Builder $q) use ($record): void {
-                                    $q->where('accountability_status', 'unassigned');
-                                    if ($record?->equipment_id) {
-                                        $q->orWhere('id', $record->equipment_id);
-                                    }
-                                })
-                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
+                            fn ($query) => $query->where(
+                                'accountability_status',
+                                'unassigned',
+                            ),
                         )
                         ->getOptionLabelFromRecordUsing(
-                            fn (Equipment $record): string => "{$record->brand} {$record->model} ({$record->property_no})",
-                        )
-                        ->searchable(['brand', 'model', 'property_no', 'serial_number'])
-                        ->preload()
-                        ->required()
-                        ->disabled(fn (Forms\Get $get) => blank($get('school_id')))
-                        ->placeholder(fn (Forms\Get $get) => blank($get('school_id'))
-                            ? 'Pick a school first'
-                            : 'Select equipment')
-                        ->disabledOn('edit'),
-                    // Accountable officer is set on the Equipment record
-                    // (Issuance tab), established at delivery — not here. An
-                    // assignment records the current custodian / end-user.
-                    Forms\Components\Select::make('custodian_id')
-                        ->label('Custodian / End User')
-                        ->relationship(
-                            'custodian',
-                            'full_name',
-                            fn (Builder $query, Forms\Get $get) => $query
-                                ->where('status', 'active')
-                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
+                            fn (
+                                Equipment $record,
+                            ): string => "{$record->brand} {$record->model} ({$record->property_no})",
                         )
                         ->searchable()
                         ->preload()
-                        ->required()
-                        ->helperText('The person who physically holds/uses this item. The fiscally accountable officer is recorded on the equipment record.')
-                        ->disabled(fn (Forms\Get $get) => blank($get('school_id')))
-                        ->placeholder(fn (Forms\Get $get) => blank($get('school_id'))
-                            ? 'Pick a school first'
-                            : 'Select custodian / end-user'),
+                        ->required(),
+                    Forms\Components\Select::make('employee_id')
+                        ->label('Accountable Officer')
+                        ->relationship(
+                            'employee',
+                            'full_name',
+                            fn ($query) => $query->where('status', 'active'),
+                        )
+                        ->searchable()
+                        ->preload()
+                        ->required(),
+                    Forms\Components\Select::make('custodian_id')
+                        ->label('Custodian / End User (if different)')
+                        ->relationship(
+                            'custodian',
+                            'full_name',
+                            fn ($query) => $query->where('status', 'active'),
+                        )
+                        ->searchable()
+                        ->preload()
+                        ->nullable(),
                     Forms\Components\Select::make('transaction_type')
-                        ->options(TransactionType::options())
+                        ->options([
+                            'Beginning Inventory' => 'Beginning Inventory',
+                            'Issuance' => 'Issuance',
+                            'Transfer' => 'Transfer',
+                            'Return' => 'Return',
+                        ])
                         ->required()
-                        ->default(TransactionType::Issuance),
+                        ->default('Issuance'),
                     Forms\Components\Select::make('supporting_doc_type')
                         ->label('Supporting Document Type')
                         ->options([
@@ -109,36 +105,30 @@ class AssignmentResource extends Resource
                             'RRSP' => 'RRSP',
                             'RRPE' => 'RRPE',
                         ]),
-                    Forms\Components\TextInput::make('supporting_doc_no')->label('Document No.'),
-                    Forms\Components\FileUpload::make('supporting_doc_file')
-                        ->label('Upload Document (PDF / Image)')
-                        ->helperText('Optional. Attach the scanned ICS / PAR / RRSP / RRPE — PDF or photo, up to 10 MB.')
-                        ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
-                        ->directory(fn (Forms\Get $get) => 'schools/' . ($get('school_id') ?? 'general') . '/assignments')
-                        ->maxSize(10240)
-                        ->openable()
-                        ->downloadable()
-                        ->previewable()
-                        ->columnSpanFull()
-                        ->dehydrated(true)
-                        ->afterStateHydrated(function (Forms\Components\FileUpload $component, ?EquipmentAssignment $record): void {
-                            if ($record && ($doc = $record->issuanceDocument())) {
-                                $component->state([$doc->file_path]);
-                            }
-                        }),
+                    Forms\Components\TextInput::make(
+                        'supporting_doc_no',
+                    )->label('Document No.'),
                     Forms\Components\DatePicker::make('assigned_at')
                         ->label('Date Assigned')
                         ->required()
                         ->default(now()),
-                    Forms\Components\DatePicker::make('custodian_received_at')
-                        ->label('Date Received by Custodian'),
-                    Forms\Components\Placeholder::make('assigned_by_display')
+                    Forms\Components\DatePicker::make(
+                        'custodian_received_at',
+                    )->label('Date Received by Custodian'),
+                    Forms\Components\TextInput::make('assigned_by')
                         ->label('Assigned By')
-                        ->content(fn () => Auth::user()?->name ?? '—')
-                        ->dehydrated(false),
-                    Forms\Components\Textarea::make('notes')->rows(3)->columnSpanFull(),
+                        ->required(),
+                    Forms\Components\Textarea::make('notes')
+                        ->rows(3)
+                        ->columnSpanFull(),
                 ])
                 ->columns(['default' => 2]),
+
+            Forms\Components\Section::make('Return Details')->schema([
+                Forms\Components\DatePicker::make('returned_at')->label(
+                    'Date Returned (leave blank if still active)',
+                ),
+            ]),
         ]);
     }
 
@@ -155,63 +145,63 @@ class AssignmentResource extends Resource
                     ->fontFamily('mono')
                     ->color('primary')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('equipment.brand')->label('Brand'),
+                Tables\Columns\TextColumn::make('equipment.brand')->label(
+                    'Brand',
+                ),
                 Tables\Columns\TextColumn::make('equipment.model')
                     ->label('Model')
                     ->weight('bold'),
                 Tables\Columns\TextColumn::make('employee.full_name')
                     ->label('Accountable Officer')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('custodian.full_name')->label('Custodian'),
+                Tables\Columns\TextColumn::make('custodian.full_name')->label(
+                    'Custodian',
+                ),
                 Tables\Columns\TextColumn::make('transaction_type')
                     ->label('Transaction')
                     ->badge()
-                    ->formatStateUsing(fn (TransactionType $state): string => $state->label())
-                    ->color(fn (TransactionType $state): string => $state->color()),
+                    ->color('info'),
                 Tables\Columns\TextColumn::make('supporting_doc_type')
                     ->label('Doc Type')
                     ->badge()
                     ->color('gray'),
-                Tables\Columns\TextColumn::make('supporting_doc_no')->label('Doc No.'),
-                Tables\Columns\TextColumn::make('issuance_doc')
-                    ->label('Issuance File')
-                    ->badge()
-                    ->color('success')
-                    ->getStateUsing(fn (EquipmentAssignment $r) => $r->issuanceDocument()?->document_type?->value)
-                    ->url(fn (EquipmentAssignment $r) => $r->issuanceDocument()?->file_url, true)
-                    ->placeholder('—')
-                    ->toggleable(),
-                Tables\Columns\TextColumn::make('return_doc')
-                    ->label('Return File')
-                    ->badge()
-                    ->color('warning')
-                    ->getStateUsing(fn (EquipmentAssignment $r) => $r->returnDocument()?->document_type?->value)
-                    ->url(fn (EquipmentAssignment $r) => $r->returnDocument()?->file_url, true)
-                    ->placeholder('—')
-                    ->toggleable(),
+                Tables\Columns\TextColumn::make('supporting_doc_no')->label(
+                    'Doc No.',
+                ),
                 Tables\Columns\TextColumn::make('assigned_at')
                     ->label('Assigned')
                     ->date()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('returned_at')->label('Returned')->date(),
-                Tables\Columns\TextColumn::make('assignedBy.name')
-                    ->label('Assigned By')
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\IconColumn::make('active')
+                Tables\Columns\TextColumn::make('returned_at')
+                    ->label('Returned')
+                    ->date(),
+                Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
-                    ->getStateUsing(fn (EquipmentAssignment $r) => $r->isActive()),
+                    ->getStateUsing(
+                        fn (EquipmentAssignment $r) => is_null($r->returned_at),
+                    ),
             ])
             ->filters([
                 Tables\Filters\Filter::make('active_only')
                     ->label('Active Only')
                     ->query(fn ($query) => $query->whereNull('returned_at'))
                     ->default(),
-                Tables\Filters\SelectFilter::make('transaction_type')->options(TransactionType::options()),
+                Tables\Filters\SelectFilter::make('transaction_type')->options([
+                    'Beginning Inventory' => 'Beginning Inventory',
+                    'Issuance' => 'Issuance',
+                    'Transfer' => 'Transfer',
+                    'Return' => 'Return',
+                ]),
                 Tables\Filters\SelectFilter::make('school_id')
                     ->label('School')
                     ->relationship('school', 'name')
-                    ->visible(fn () => Auth::user()?->hasRole('super-admin')),
+                    ->visible(function () {
+                        /** @var \App\Models\User $user */
+                        $user = Auth::user();
+
+                        return $user->hasRole('super-admin');
+                    }),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
@@ -222,8 +212,20 @@ class AssignmentResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
-            ->with(['equipment', 'employee', 'custodian', 'school', 'assignedBy', 'documents']);
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+
+        $query = parent::getEloquentQuery();
+
+        $query->when(
+            fn () => $user && ! $user->hasRole('super-admin'),
+            fn (Builder $q) => $q->where(
+                fn (Builder $q2) => $q2->where('school_id', $user->school_id)
+                    ->orWhereNull('school_id'),
+            ),
+        );
+
+        return $query;
     }
 
     public static function getPages(): array
@@ -233,40 +235,5 @@ class AssignmentResource extends Resource
             'create' => Pages\CreateAssignment::route('/create'),
             'edit' => Pages\EditAssignment::route('/{record}/edit'),
         ];
-    }
-
-    /**
-     * Role-based authorization. SchoolScope already isolates rows per school;
-     * this gate decides which actions each role can perform within their scope.
-     *
-     * - super-admin / sdo-admin: full access
-     * - school-admin: view + create + update (return flow + corrections)
-     * - technician: view only
-     * - viewer: view only
-     * - delete/forceDelete/restore: super-admin / sdo-admin only — assignment
-     *   history is audit-bearing and should not be removed casually
-     */
-    public static function can(string $action, ?Model $record = null): bool
-    {
-        /** @var User|null $user */
-        $user = Auth::user();
-
-        if (! $user instanceof User) {
-            return false;
-        }
-
-        if ($user->hasRole(['super-admin', 'sdo-admin'])) {
-            return true;
-        }
-
-        if (in_array($action, ['view', 'viewAny'], true)) {
-            return $user->hasRole(['school-admin', 'technician', 'viewer']);
-        }
-
-        if (in_array($action, ['create', 'update'], true)) {
-            return $user->hasRole('school-admin');
-        }
-
-        return false;
     }
 }

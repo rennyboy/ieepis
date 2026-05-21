@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\DocumentType;
 use App\Filament\Resources\DocumentResource\Pages;
 use App\Models\Document;
 use Filament\Forms;
@@ -20,8 +19,7 @@ class DocumentResource extends Resource
         /** @var \App\Models\User|null $user */
         $user = Auth::user();
 
-        $query = parent::getEloquentQuery()
-            ->with(['equipment', 'employee', 'uploadedBy', 'school']);
+        $query = parent::getEloquentQuery();
 
         $query->when(
             fn () => $user && $user->school_id && ! $user->hasRole('super-admin'),
@@ -35,9 +33,22 @@ class DocumentResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
 
-    protected static ?string $navigationGroup = 'Documents & Tickets';
+    protected static ?string $navigationGroup = 'Support';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
+
+    public static array $docTypes = [
+        'PAR' => 'PAR – Property Acknowledgment Receipt',
+        'ICS' => 'ICS – Inventory Custodian Slip',
+        'IAR' => 'IAR – Inspection and Acceptance Report',
+        'DR' => 'DR – Delivery Receipt',
+        'OR' => 'OR – Official Receipt',
+        'SI' => 'SI – Sales Invoice',
+        'WMR' => 'WMR – Waste Material Report',
+        'RRSP' => 'RRSP – Report on the Remedies of Seized Properties',
+        'RRPE' => 'RRPE – Report on Physical Count of Property & Equipment',
+        'Other' => 'Other',
+    ];
 
     public static function form(Form $form): Form
     {
@@ -49,11 +60,21 @@ class DocumentResource extends Resource
                         ->relationship('school', 'name')
                         ->searchable()
                         ->preload()
-                        ->required()
-                        ->default(fn () => auth()->user()->school_id)
-                        ->disabled(fn () => ! in_array('super-admin', auth()->user()->getRoleNames()->toArray())),
+                        ->required(),
+                    Forms\Components\Select::make('equipment_id')
+                        ->label('Related Equipment')
+                        ->relationship('equipment', 'model')
+                        ->searchable()
+                        ->preload()
+                        ->nullable(),
+                    Forms\Components\Select::make('employee_id')
+                        ->label('Related Employee')
+                        ->relationship('employee', 'full_name')
+                        ->searchable()
+                        ->preload()
+                        ->nullable(),
                     Forms\Components\Select::make('document_type')
-                        ->options(DocumentType::options())
+                        ->options(self::$docTypes)
                         ->required(),
                     Forms\Components\TextInput::make('document_no')->label(
                         'Document No.',
@@ -110,12 +131,19 @@ class DocumentResource extends Resource
                 Tables\Columns\TextColumn::make('school.name')
                     ->label('School')
                     ->limit(25),
+                Tables\Columns\TextColumn::make('equipment.model')->label(
+                    'Equipment',
+                ),
+                Tables\Columns\TextColumn::make('employee.full_name')->label(
+                    'Employee',
+                ),
                 Tables\Columns\TextColumn::make('document_date')
                     ->label('Date')
                     ->date()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('uploadedBy.name')
-                    ->label('Uploaded By'),
+                Tables\Columns\TextColumn::make('uploadedBy.name')->label(
+                    'Uploaded By',
+                ),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Uploaded')
                     ->since()
@@ -123,7 +151,7 @@ class DocumentResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('document_type')->options(
-                    DocumentType::options(),
+                    self::$docTypes,
                 ),
                 Tables\Filters\SelectFilter::make('school')
                     ->relationship('school', 'name')

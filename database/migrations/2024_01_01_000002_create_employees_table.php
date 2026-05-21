@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('employees', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('school_id')->constrained()->restrictOnDelete();
+            $table->foreignId('school_id')->constrained()->cascadeOnDelete();
             $table->string('employee_number')->unique();
             $table->string('first_name');
             $table->string('last_name');

@@ -5,109 +5,85 @@ namespace App\Models;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
- * User Model — auth identity only.
+ * User Model
  *
- * Personal/organizational data (full_name, school_id, division_id) lives on
- * `Employee`. A User links to an Employee via `employees.user_id`. Reads of
- * `$user->name`, `$user->school_id`, `$user->division_id` are delegated to the
- * employee — no callsite changes required.
+ * This model represents system users with role-based access control.
+ * Uses Spatie Permission package for role and permission management.
  *
  * @property int $id
+ * @property string $name
  * @property string $email
- * @property string|null $password
- * @property string|null $google_id
- * @property string|null $approval_status
- * @property string|null $remember_token
+ * @property string $password
+ * @property int|null $school_id Foreign key to schools table
  * @property \Carbon\Carbon|null $email_verified_at
+ * @property string|null $remember_token
  * @property \Carbon\Carbon|null $created_at
  * @property \Carbon\Carbon|null $updated_at
  *
- * Delegated (read-only via accessor):
- * @property-read string $name
- * @property-read int|null $school_id
- * @property-read int|null $division_id
- * @property-read \App\Models\School|null $school
+ * Spatie Permission: Instance Methods
+ * @method bool hasRole(string|array $roles) Check if user has one or more roles
+ * @method bool hasAnyRole(string|array $roles) Check if user has any of the given roles
+ * @method bool hasAllRoles(string|array $roles) Check if user has all of the given roles
+ * @method Collection getRoleNames() Get all role names
+ * @method void assignRole(string|array|Collection $roles) Assign role(s) to user
+ * @method void syncRoles(string|array|Collection $roles) Sync roles for user
+ * @method void removeRole(string|array $roles) Remove role(s) from user
+ * @method bool hasPermission(string $permission) Check if user has permission
+ * @method bool hasAnyPermission(string|array $permissions) Check if user has any permission
+ * @method bool hasAllPermissions(string|array $permissions) Check if user has all permissions
+ * @method Collection getPermissionsViaRoles() Get all permissions from roles
+ * @method void givePermissionTo(string|array|Collection $permissions) Grant permission(s)
+ * @method void revokePermissionFor(string|array $permissions) Revoke permission(s)
+ * @method void syncPermissions(string|array|Collection $permissions) Sync permissions
  *
- * @method bool hasRole(string|array $roles)
- * @method bool hasAnyRole(string|array $roles)
- * @method \Illuminate\Support\Collection getRoleNames()
+ * Spatie Permission: Query Builder Scopes
+ * @method static Builder|static role(string|array $roles) Filter users by roles
+ * @method static Builder|static permission(string|array $permissions) Filter users by permissions
  *
  * @mixin \Spatie\Permission\Traits\HasRoles
  */
 class User extends Authenticatable implements FilamentUser
 {
-    use HasFactory, HasRoles, Notifiable;
+    use HasFactory, Notifiable, HasRoles;
 
-    protected $fillable = ['email', 'password', 'approval_status', 'google_id', 'school_id'];
-
-    protected $hidden = ['password', 'remember_token'];
-
+    protected $fillable = ["name", "email", "password", "school_id", "approval_status", "division", "division_id"];
+    protected $hidden = ["password", "remember_token"];
     protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-        'approval_status' => 'string',
+        "email_verified_at" => "datetime",
+        "password" => "hashed",
+        "approval_status" => "string",
     ];
 
     /**
-     * Only `name` is appended — it has no underlying column. `school_id` IS a
-     * column (auto-serialized) and `division_id` is a 3-hop chain that should
-     * be requested explicitly (or via `with('employee.school.district')`),
-     * never auto-fired on every serialization.
+     * Get the school this user belongs to.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\School, self>
      */
-    protected $appends = ['name'];
-
-    /**
-     * Auto-eager-load `employee` so reads of `$user->name` and the school_id
-     * accessor fallback don't trigger a query per access. Costs one extra
-     * JOIN-equivalent per User query; pays itself back many times in Filament
-     * list pages, navbar widget, and per-request auth.
-     */
-    protected $with = ['employee'];
-
-    /**
-     * @return HasOne<\App\Models\Employee>
-     */
-    public function employee(): HasOne
+    public function school(): BelongsTo
     {
-        return $this->hasOne(Employee::class);
-    }
-
-    public function getNameAttribute(): string
-    {
-        return $this->employee?->full_name ?? $this->email ?? '';
-    }
-
-    public function getSchoolIdAttribute(): ?int
-    {
-        return array_key_exists('school_id', $this->attributes)
-            ? $this->attributes['school_id']
-            : ($this->employee?->school_id ?? null);
-    }
-
-    public function getDivisionIdAttribute(): ?int
-    {
-        return $this->employee?->school?->district?->division_id;
+        return $this->belongsTo(School::class);
     }
 
     /**
-     * Backward-compat: callsites that did `$user->school` keep working.
+     * Determine if the user can access the Filament panel.
+     * Blocks pending and rejected users from accessing the system.
      */
-    public function getSchoolAttribute(): ?School
-    {
-        return $this->employee?->school;
-    }
-
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->approval_status === 'approved' && $this->roles()->exists();
+        return $this->approval_status === 'approved';
     }
 
+    /**
+     * Check if the user's account is approved.
+     */
     public function isApproved(): bool
     {
         return $this->approval_status === 'approved';

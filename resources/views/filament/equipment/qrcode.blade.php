@@ -26,7 +26,7 @@
         </div>
         <div class="flex justify-between">
             <span class="font-medium">Condition:</span>
-            <span>{{ $record->condition?->label() }}</span>
+            <span>{{ $record->condition }}</span>
         </div>
     </div>
 
