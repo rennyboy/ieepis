@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\EmployeeStatus;
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Filament\Resources\EmployeeResource\RelationManagers;
 use App\Models\Employee;
@@ -35,9 +36,9 @@ class EmployeeResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $navigationGroup = 'Management';
+    protected static ?string $navigationGroup = 'People';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $recordTitleAttribute = 'full_name';
 
@@ -94,13 +95,9 @@ class EmployeeResource extends Resource
                         ])
                         ->required(),
                     Forms\Components\Select::make('status')
-                        ->options([
-                            'active' => 'Active',
-                            'inactive' => 'Inactive',
-                            'retired' => 'Retired',
-                        ])
+                        ->options(EmployeeStatus::options())
                         ->required()
-                        ->default('active'),
+                        ->default(EmployeeStatus::Active),
                     Forms\Components\DatePicker::make('date_hired')->label(
                         'Date Hired',
                     ),
@@ -190,7 +187,14 @@ class EmployeeResource extends Resource
                     ->label('Employee No.')
                     ->searchable()
                     ->fontFamily('mono')
-                    ->color('primary'),
+                    ->badge(fn ($record): bool => ! $record->hasRealEmployeeNumber())
+                    ->formatStateUsing(fn ($record): string => $record->hasRealEmployeeNumber()
+                        ? $record->employee_number
+                        : 'No ID yet')
+                    ->color(fn ($record): string => $record->hasRealEmployeeNumber() ? 'primary' : 'gray')
+                    ->tooltip(fn ($record): ?string => $record->hasRealEmployeeNumber()
+                        ? null
+                        : 'No employee number issued yet — placeholder: '.$record->employee_number),
                 Tables\Columns\TextColumn::make('position')->searchable(),
                 Tables\Columns\TextColumn::make('school.name')
                     ->label('School')
@@ -204,20 +208,15 @@ class EmployeeResource extends Resource
                         'info' => 'teaching',
                         'warning' => 'non-teaching',
                     ]),
-                Tables\Columns\TextColumn::make('current_equipment_count')
+                Tables\Columns\TextColumn::make('active_assignments_count')
                     ->label('Equipment')
                     ->badge()
                     ->color('primary')
-                    ->getStateUsing(
-                        fn (Employee $r) => $r->activeAssignments()->count(),
-                    ),
+                    ->counts('activeAssignments'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->colors([
-                        'success' => 'active',
-                        'danger' => 'inactive',
-                        'gray' => 'retired',
-                    ]),
+                    ->formatStateUsing(fn (EmployeeStatus $state): string => $state->label())
+                    ->color(fn (EmployeeStatus $state): string => $state->color()),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('school')
@@ -228,16 +227,93 @@ class EmployeeResource extends Resource
                     'teaching' => 'Teaching',
                     'non-teaching' => 'Non-Teaching',
                 ]),
-                Tables\Filters\SelectFilter::make('status')->options([
-                    'active' => 'Active',
-                    'inactive' => 'Inactive',
-                    'retired' => 'Retired',
-                ]),
+                Tables\Filters\SelectFilter::make('status')->options(EmployeeStatus::options()),
+                Tables\Filters\TernaryFilter::make('employee_number_status')
+                    ->label('Employee No.')
+                    ->placeholder('All')
+                    ->trueLabel('Has employee number')
+                    ->falseLabel('Pending — no ID yet')
+                    ->queries(
+                        true: fn ($query) => $query->hasEmployeeNumber(),
+                        false: fn ($query) => $query->pendingEmployeeNumber(),
+                        blank: fn ($query) => $query,
+                    ),
             ])
             ->heading(new \Illuminate\Support\HtmlString(view('filament.components.export-button', [
                 'route' => 'employees.pdf.bulk',
                 'label' => 'Export Personnel (PDF)',
             ])->render()))
+            ->headerActions([
+                Tables\Actions\Action::make('exportExcel')
+                    ->label('Export Excel')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
+                    ->url(route('employees.excel.export')),
+                Tables\Actions\Action::make('downloadTemplate')
+                    ->label('Download Template')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->url(route('employees.excel.template')),
+                Tables\Actions\Action::make('importEmployees')
+                    ->label('Import Excel')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('primary')
+                    ->modalHeading('Import Employees from Excel')
+                    ->modalDescription('Upload an Excel file (.xlsx, .xls, or .csv) to import employees.')
+                    ->form([
+                        Forms\Components\Select::make('target_school_id')
+                            ->label('Target School')
+                            ->helperText('Rows without a "school" column will land in this school.')
+                            ->options(fn () => \App\Models\School::orderBy('name')->pluck('name', 'id'))
+                            ->searchable()
+                            ->default(fn () => \Illuminate\Support\Facades\Auth::user()?->school_id)
+                            ->disabled(fn () => \Illuminate\Support\Facades\Auth::user()?->hasRole('school-admin') ?? false)
+                            ->dehydrated()
+                            ->required(),
+                        Forms\Components\FileUpload::make('file')
+                            ->label('Select File')
+                            ->directory('imports')
+                            ->acceptedFileTypes([
+                                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                'application/vnd.ms-excel',
+                                'text/csv',
+                                'text/plain',
+                                'application/csv',
+                                'application/octet-stream',
+                                'text/x-csv',
+                                'text/comma-separated-values',
+                            ])
+                            ->rules(['file', 'mimes:csv,txt,xlsx,xls'])
+                            ->maxSize(10240)
+                            ->required(),
+                    ])
+                    ->action(function (array $data) {
+                        try {
+                            $import = new \App\Imports\EmployeeImport((int) $data['target_school_id']);
+                            \Maatwebsite\Excel\Facades\Excel::import($import, $data['file'], 'public');
+
+                            if ($import->getRowCount() === 0) {
+                                \Filament\Notifications\Notification::make()
+                                    ->warning()
+                                    ->title('Import Skipped')
+                                    ->body('The uploaded file was empty or contained no valid employee rows.')
+                                    ->send();
+                                return;
+                            }
+
+                            \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('Import Successful')
+                                ->body($import->getRowCount() . ' employee records have been imported or updated.')
+                                ->send();
+                        } catch (\Exception $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->danger()
+                                ->title('Import Failed')
+                                ->body('Error: ' . $e->getMessage())
+                                ->send();
+                        }
+                    }),
+            ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
@@ -271,7 +347,10 @@ class EmployeeResource extends Resource
                     Infolists\Components\TextEntry::make(
                         'employment_type',
                     )->badge(),
-                    Infolists\Components\TextEntry::make('status')->badge(),
+                    Infolists\Components\TextEntry::make('status')
+                        ->badge()
+                        ->formatStateUsing(fn (EmployeeStatus $state): string => $state->label())
+                        ->color(fn (EmployeeStatus $state): string => $state->color()),
                     Infolists\Components\TextEntry::make('email'),
                     Infolists\Components\TextEntry::make('mobile_1'),
                     Infolists\Components\TextEntry::make('date_hired')->date(),

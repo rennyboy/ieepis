@@ -2,18 +2,30 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\DocumentType;
+use App\Enums\AccountabilityStatus;
+use App\Enums\EquipmentCondition;
+use App\Enums\TransactionType;
 use App\Filament\Resources\EquipmentResource\Pages;
 use App\Filament\Resources\EquipmentResource\RelationManagers;
+use App\Exports\EquipmentExport;
+use App\Imports\EquipmentImport;
+use App\Models\Document;
 use App\Models\Equipment;
+use Filament\Actions as PageActions;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Maatwebsite\Excel\Facades\Excel;
 
 class EquipmentResource extends Resource
 {
@@ -85,7 +97,9 @@ class EquipmentResource extends Resource
                                 ->searchable()
                                 ->preload()
                                 ->required()
-                                ->columnSpanFull(),
+                                ->columnSpanFull()
+                                ->default(fn () => auth()->user()->school_id)
+                                ->disabled(fn () => ! in_array('super-admin', auth()->user()->getRoleNames()->toArray())),
 
                             Forms\Components\TextInput::make('property_no')
                                 ->label('Property No.')
@@ -267,27 +281,13 @@ class EquipmentResource extends Resource
                                 ->label('Functional')
                                 ->default(true),
                             Forms\Components\Select::make('condition')
-                                ->options([
-                                    'Good' => 'Good',
-                                    'Fair' => 'Fair',
-                                    'Poor' => 'Poor',
-                                    'Unserviceable' => 'Unserviceable',
-                                ])
+                                ->options(EquipmentCondition::options())
                                 ->required(),
                             Forms\Components\Select::make(
                                 'accountability_status',
                             )
                                 ->label('Accountability / Disposition Status')
-                                ->options([
-                                    'Normal' => 'Normal',
-                                    'assigned' => 'Assigned',
-                                    'unassigned' => 'Unassigned',
-                                    'Transferred' => 'Transferred',
-                                    'Stolen' => 'Stolen',
-                                    'Lost' => 'Lost',
-                                    'Damaged' => 'Damaged due to calamity',
-                                    'For Disposal' => 'For Disposal',
-                                ])
+                                ->options(AccountabilityStatus::options())
                                 ->required(),
                             Forms\Components\Select::make(
                                 'equipment_condition_coa',
@@ -315,6 +315,26 @@ class EquipmentResource extends Resource
                     Forms\Components\Tabs\Tab::make('Issuance')
                         ->icon('heroicon-o-user-circle')
                         ->schema([
+                            Forms\Components\Select::make('accountable_officer_id')
+                                ->label('Accountable Officer (PAR/ICS holder)')
+                                ->relationship(
+                                    'accountableOfficer',
+                                    'full_name',
+                                    fn (Builder $query, Get $get) => $query
+                                        ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
+                                )
+                                ->searchable()
+                                ->preload()
+                                ->nullable()
+                                ->helperText('Employee fiscally accountable for this item per the delivery/PAR/ICS receipt. Changes are recorded as a property transfer in the activity log.')
+                                ->columnSpanFull(),
+                            Forms\Components\Select::make('document_id')
+                                ->label('Linked Document (DR/PAR/ICS)')
+                                ->options(fn () => \App\Models\Document::whereIn('document_type', ['DR', 'PAR', 'ICS'])
+                                    ->orderBy('title')
+                                    ->pluck('title', 'id'))
+                                ->searchable()
+                                ->nullable(),
                             Forms\Components\Select::make(
                                 'transaction_type',
                             )->options([
@@ -369,7 +389,7 @@ class EquipmentResource extends Resource
                     ->limit(30)
                     ->tooltip(fn ($record) => $record->school?->name),
                 Tables\Columns\TextColumn::make(
-                    'activeAssignment.employee.full_name',
+                    'accountableOfficer.full_name',
                 )
                     ->label('Accountable Officer')
                     ->searchable()
@@ -397,16 +417,12 @@ class EquipmentResource extends Resource
                 Tables\Columns\TextColumn::make('accountability_status')
                     ->label('Status')
                     ->badge()
-                    ->colors([
-                        'success' => 'Normal',
-                        'info' => 'assigned',
-                        'warning' => 'unassigned',
-                        'danger' => fn ($state) => in_array($state, [
-                            'Stolen',
-                            'Lost',
-                            'For Disposal',
-                        ]),
-                    ]),
+                    ->formatStateUsing(fn (AccountabilityStatus $state): string => $state->label())
+                    ->color(fn (AccountabilityStatus $state): string => $state->color()),
+                Tables\Columns\TextColumn::make('document.title')
+                    ->label('Linked Doc')
+                    ->limit(25)
+                    ->color('primary'),
                 Tables\Columns\TextColumn::make('warranty_status')
                     ->label('Warranty')
                     ->getStateUsing(fn (Equipment $r) => $r->warranty_status)
@@ -445,18 +461,8 @@ class EquipmentResource extends Resource
                 ),
                 Tables\Filters\SelectFilter::make(
                     'accountability_status',
-                )->options([
-                    'Normal' => 'Normal',
-                    'assigned' => 'Assigned',
-                    'unassigned' => 'Unassigned',
-                    'For Disposal' => 'For Disposal',
-                ]),
-                Tables\Filters\SelectFilter::make('condition')->options([
-                    'Good' => 'Good',
-                    'Fair' => 'Fair',
-                    'Poor' => 'Poor',
-                    'Unserviceable' => 'Unserviceable',
-                ]),
+                )->options(AccountabilityStatus::options()),
+                Tables\Filters\SelectFilter::make('condition')->options(EquipmentCondition::options()),
                 Tables\Filters\TernaryFilter::make('is_dcp')->label('DCP Only'),
                 Tables\Filters\TernaryFilter::make('is_functional')->label(
                     'Functional Only',
@@ -466,9 +472,80 @@ class EquipmentResource extends Resource
                 'route' => 'equipment.pdf.bulk',
                 'label' => 'Export Inventory (PDF)',
             ])->render()))
+            ->headerActions([
+                Tables\Actions\Action::make('exportExcel')
+                    ->label('Export Excel')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('success')
+                    ->url(route('equipment.excel.export')),
+                Tables\Actions\Action::make('downloadTemplate')
+                    ->label('Download Template')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->url(route('equipment.excel.template')),
+                Tables\Actions\Action::make('importEquipment')
+                    ->label('Import Excel')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('primary')
+                    ->modalHeading('Import Equipment from Excel')
+                    ->modalDescription('Upload an Excel file (.xlsx, .xls, or .csv) to import equipment.')
+                    ->form([
+                        Forms\Components\Select::make('target_school_id')
+                            ->label('Target School')
+                            ->helperText('Rows without a "school" column will land in this school.')
+                            ->options(fn () => \App\Models\School::orderBy('name')->pluck('name', 'id'))
+                            ->searchable()
+                            ->default(fn () => \Illuminate\Support\Facades\Auth::user()?->school_id)
+                            ->disabled(fn () => \Illuminate\Support\Facades\Auth::user()?->hasRole('school-admin') ?? false)
+                            ->dehydrated()
+                            ->required(),
+                        Forms\Components\FileUpload::make('file')
+                            ->label('Select File')
+                            ->directory('imports')
+                            ->acceptedFileTypes([
+                                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                'application/vnd.ms-excel',
+                                'text/csv',
+                                'text/plain',
+                                'application/csv',
+                                'application/octet-stream',
+                                'text/x-csv',
+                                'text/comma-separated-values',
+                            ])
+                            ->rules(['file', 'mimes:csv,txt,xlsx,xls'])
+                            ->maxSize(10240)
+                            ->required(),
+                    ])
+                    ->action(function (array $data) {
+                        try {
+                            $import = new \App\Imports\EquipmentImport((int) $data['target_school_id']);
+                            Excel::import($import, $data['file'], 'public');
+
+                            if ($import->getRowCount() === 0) {
+                                Notification::make()
+                                    ->warning()
+                                    ->title('Import Skipped')
+                                    ->body('The uploaded file was empty or contained no valid equipment rows.')
+                                    ->send();
+                                return;
+                            }
+
+                            $summary = $import->getResolutionSummary();
+                            $reportFilename = \App\Http\Controllers\EquipmentExcelController::storeUnresolvedReport($summary);
+                            \App\Http\Controllers\EquipmentExcelController::notifyImportResult($summary, $reportFilename);
+                        } catch (\Throwable $e) {
+                            Notification::make()
+                                ->danger()
+                                ->title('Import Failed')
+                                ->body('Error: ' . $e->getMessage())
+                                ->send();
+                        }
+                    }),
+            ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                self::sharedDocumentViewAction(),
+                self::sharedDocumentAttachAction(),
                 Tables\Actions\Action::make('qrcode')
                     ->label('QR Code')
                     ->icon('heroicon-o-qr-code')
@@ -540,24 +617,28 @@ class EquipmentResource extends Resource
                                 ->boolean(),
                             Infolists\Components\TextEntry::make(
                                 'condition',
-                            )->badge(),
+                            )->badge()
+                                ->formatStateUsing(fn (EquipmentCondition $state): string => $state->label())
+                                ->color(fn (EquipmentCondition $state): string => $state->color()),
                             Infolists\Components\TextEntry::make(
                                 'accountability_status',
                             )
                                 ->label('Status')
-                                ->badge(),
+                                ->badge()
+                                ->formatStateUsing(fn (AccountabilityStatus $state): string => $state->label())
+                                ->color(fn (AccountabilityStatus $state): string => $state->color()),
                             Infolists\Components\TextEntry::make(
                                 'equipment_location',
                             )->label('Location'),
                             Infolists\Components\TextEntry::make(
                                 'assignments_count',
-                            )->getStateUsing(fn ($record) => $record->assignments()->count())
+                            )->getStateUsing(fn ($record) => $record->assignments_count ?? $record->assignments()->count())
                                 ->label('Ownership Transfers')
                                 ->badge()
                                 ->color('success'),
                             Infolists\Components\TextEntry::make(
                                 'maintenance_tickets_count',
-                            )->getStateUsing(fn ($record) => $record->maintenanceTickets()->count())
+                            )->getStateUsing(fn ($record) => $record->maintenance_tickets_count ?? $record->maintenanceTickets()->count())
                                 ->label('Maintenance Performed')
                                 ->badge()
                                 ->color('warning'),
@@ -621,7 +702,9 @@ class EquipmentResource extends Resource
         /** @var \App\Models\User $user */
         $user = \Illuminate\Support\Facades\Auth::user();
 
-        $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery()
+            ->with(['accountableOfficer', 'activeAssignment.employee', 'document'])
+            ->withCount(['assignments', 'maintenanceTickets']);
 
         $query->when(
             fn () => $user->hasRole('school-admin'),
@@ -644,5 +727,149 @@ class EquipmentResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return ['property_no', 'serial_number', 'brand', 'model'];
+    }
+
+    /**
+     * Form schema used by both the table-row and page-header "Attach Document" actions.
+     *
+     * @return array<\Filament\Forms\Components\Component>
+     */
+    protected static function attachDocumentForm(): array
+    {
+        return [
+            Forms\Components\Toggle::make('link_existing')
+                ->label('Link to Existing Document')
+                ->live(),
+            Forms\Components\Select::make('existing_document_id')
+                ->label('Select Document to Link')
+                ->options(fn () => \App\Models\Document::whereIn('document_type', ['DR', 'PAR', 'ICS'])
+                    ->orderBy('title')
+                    ->pluck('title', 'id'))
+                ->searchable()
+                ->visible(fn (Get $get) => $get('link_existing'))
+                ->nullable(),
+            Forms\Components\TextInput::make('existing_document_id_alt')
+                ->label('Or Enter Document No.')
+                ->visible(fn (Get $get) => $get('link_existing'))
+                ->nullable(),
+            Forms\Components\Select::make('document_type')
+                ->options(DocumentType::options())
+                ->required()
+                ->visible(fn (Get $get) => !$get('link_existing')),
+            Forms\Components\TextInput::make('document_no')->label('Document No.')
+                ->visible(fn (Get $get) => !$get('link_existing')),
+            Forms\Components\DatePicker::make('document_date')->default(now())
+                ->visible(fn (Get $get) => !$get('link_existing')),
+            Forms\Components\TextInput::make('title')->required()->columnSpanFull(),
+            Forms\Components\Textarea::make('description')->columnSpanFull()
+                ->visible(fn (Get $get) => !$get('link_existing')),
+            Forms\Components\FileUpload::make('file_path')
+                ->label('File')
+                ->disk('public')
+                ->directory(fn (Equipment $record) => "schools/{$record->school_id}/documents")
+                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+                ->maxSize(10240)
+                ->required()
+                ->visible(fn (Get $get) => !$get('link_existing'))
+                ->columnSpanFull(),
+        ];
+    }
+
+    protected static function attachDocumentHandler(Equipment $record, array $data): void
+    {
+        $linkExisting = $data['link_existing'] ?? false;
+
+        if ($linkExisting && !empty($data['existing_document_id'])) {
+            // Link to existing document
+            $doc = \App\Models\Document::find($data['existing_document_id']);
+            if ($doc) {
+                $doc->update(['equipment_id' => $record->id]);
+                Notification::make()
+                    ->success()
+                    ->title('Document linked')
+                    ->body("Now linked to {$doc->title}")
+                    ->send();
+            }
+            return;
+        }
+
+        // Create new document (current behavior)
+        Document::create([
+            'school_id' => $record->school_id,
+            'equipment_id' => $record->id,
+            'document_type' => $data['document_type'],
+            'document_no' => $data['document_no'] ?? null,
+            'title' => $data['title'],
+            'description' => $data['description'] ?? null,
+            'file_path' => $data['file_path'],
+            'document_date' => $data['document_date'] ?? null,
+            'uploaded_by_id' => Auth::id(),
+        ]);
+
+        Notification::make()
+            ->success()
+            ->title('Document attached')
+            ->body('The file is now linked to this equipment.')
+            ->send();
+    }
+
+    /**
+     * Table row action — opens the most recent document in a new tab when one exists.
+     */
+    public static function sharedDocumentViewAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('sharedDocumentView')
+            ->label('Document')
+            ->icon('heroicon-o-document-arrow-down')
+            ->color('success')
+            ->visible(fn (Equipment $record) => $record->hasSharedDocument() && $record->sharedDocument()?->file_path)
+            ->url(fn (Equipment $record) => Storage::disk('public')->url($record->sharedDocument()->file_path))
+            ->openUrlInNewTab();
+    }
+
+    /**
+     * Table row action — upload a document when none is attached yet.
+     */
+    public static function sharedDocumentAttachAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('sharedDocumentAttach')
+            ->label('Attach Document')
+            ->icon('heroicon-o-document-plus')
+            ->color('warning')
+            ->visible(fn (Equipment $record) => ! $record->hasSharedDocument())
+            ->modalHeading('Attach or Link Document')
+            ->modalSubmitActionLabel('Upload')
+            ->form(self::attachDocumentForm())
+            ->action(fn (Equipment $record, array $data) => self::attachDocumentHandler($record, $data));
+    }
+
+    /**
+     * Page header variant — same behaviour as the row "view" action, scoped to a single record.
+     */
+    public static function sharedDocumentViewPageAction(): PageActions\Action
+    {
+        return PageActions\Action::make('sharedDocumentView')
+            ->label('Document')
+            ->icon('heroicon-o-document-arrow-down')
+            ->color('success')
+            ->visible(fn (Equipment $record) => $record->hasSharedDocument() && $record->sharedDocument()?->file_path)
+            ->url(fn (Equipment $record) => Storage::disk('public')->url($record->sharedDocument()->file_path))
+            ->openUrlInNewTab();
+    }
+
+    /**
+     * Page header variant — upload modal scoped to the current record.
+     */
+    public static function sharedDocumentAttachPageAction(): PageActions\Action
+    {
+        return PageActions\Action::make('sharedDocumentAttach')
+            ->label('Attach Document')
+            ->icon('heroicon-o-document-plus')
+            ->color('warning')
+            ->visible(fn (Equipment $record) => ! $record->hasSharedDocument())
+            ->modalHeading('Attach or Link Document')
+            ->modalSubmitActionLabel('Upload')
+            ->form(self::attachDocumentForm())
+            ->action(fn (Equipment $record, array $data) => self::attachDocumentHandler($record, $data));
     }
 }

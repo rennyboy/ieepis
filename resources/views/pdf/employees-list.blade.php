@@ -43,7 +43,7 @@
                     <td>{{ $employee->position }}</td>
                     <td>{{ $employee->school?->name }}</td>
                     <td>{{ ucfirst($employee->status) }}</td>
-                    <td class="text-center">{{ $employee->activeAssignments()->count() }}</td>
+                    <td class="text-center">{{ $employee->active_assignments_count }}</td>
                 </tr>
                 @endforeach
             </tbody>

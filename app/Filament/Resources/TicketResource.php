@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\TicketResource\Pages;
+use App\Models\Equipment;
 use App\Models\Ticket;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -10,6 +11,8 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use App\Enums\TicketStatus;
+use App\Enums\TicketPriority;
 
 class TicketResource extends Resource
 {
@@ -18,7 +21,8 @@ class TicketResource extends Resource
         /** @var \App\Models\User $user */
         $user = \Illuminate\Support\Facades\Auth::user();
 
-        $query = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery()
+            ->with(['school', 'equipment', 'reporter', 'assignedTo']);
 
         $query->when(
             fn () => $user->hasRole('school-admin'),
@@ -32,15 +36,21 @@ class TicketResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-ticket';
 
-    protected static ?string $navigationGroup = 'Support';
+    protected static ?string $navigationGroup = 'Documents & Tickets';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $navigationBadgeColor = 'danger';
 
     public static function getNavigationBadge(): ?string
     {
-        $count = static::getModel()::whereIn('status', ['open', 'in-progress'])
+        // Reuse the scoped query so the badge respects the school-admin
+        // restriction in getEloquentQuery() instead of counting every school.
+        $count = static::getEloquentQuery()
+            ->whereIn('status', [
+                TicketStatus::Open->value,
+                TicketStatus::InProgress->value,
+            ])
             ->count();
 
         return $count > 0 ? (string) $count : null;
@@ -63,13 +73,27 @@ class TicketResource extends Resource
                         ->required(),
                     Forms\Components\Select::make('equipment_id')
                         ->label('Related Equipment')
-                        ->relationship('equipment', 'model')
-                        ->searchable()
+                        ->relationship(
+                            'equipment',
+                            'model',
+                            fn (Builder $query, Forms\Get $get) => $query
+                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
+                        )
+                        ->getOptionLabelFromRecordUsing(
+                            fn (Equipment $record): string => trim("{$record->brand} {$record->model}")." ({$record->property_no})",
+                        )
+                        ->searchable(['brand', 'model', 'property_no', 'serial_number'])
                         ->preload()
+                        ->placeholder('Search by property no, serial, brand or model')
                         ->nullable(),
                     Forms\Components\Select::make('reporter_id')
                         ->label('Reported By')
-                        ->relationship('reporter', 'full_name')
+                        ->relationship(
+                            'reporter',
+                            'full_name',
+                            fn (Builder $query, Forms\Get $get) => $query
+                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
+                        )
                         ->searchable()
                         ->preload()
                         ->required(),
@@ -86,35 +110,29 @@ class TicketResource extends Resource
             Forms\Components\Section::make('Status & Assignment')
                 ->schema([
                     Forms\Components\Select::make('priority')
-                        ->options([
-                            'low' => 'Low',
-                            'medium' => 'Medium',
-                            'high' => 'High',
-                            'critical' => 'Critical',
-                        ])
+                        ->options(TicketPriority::options())
                         ->required()
-                        ->default('medium'),
+                        ->default(TicketPriority::Medium),
                     Forms\Components\Select::make('status')
-                        ->options([
-                            'open' => 'Open',
-                            'in-progress' => 'In Progress',
-                            'pending' => 'Pending',
-                            'resolved' => 'Resolved',
-                            'closed' => 'Closed',
-                        ])
+                        ->options(TicketStatus::options())
                         ->required()
-                        ->default('open'),
+                        ->default(TicketStatus::Open),
                     Forms\Components\Select::make('assigned_to_id')
                         ->label('Assigned Technician')
-                        ->relationship('assignedTo', 'full_name')
+                        ->relationship(
+                            'assignedTo',
+                            'full_name',
+                            fn (Builder $query, Forms\Get $get) => $query
+                                ->when($get('school_id'), fn (Builder $q, $sid) => $q->where('school_id', $sid)),
+                        )
                         ->searchable()
                         ->preload()
                         ->nullable(),
                     Forms\Components\DateTimePicker::make('resolved_at')->label(
                         'Resolved At',
                     ),
-                    Forms\Components\Textarea::make('remarks')
-                        ->label('Remarks')
+                    Forms\Components\Textarea::make('resolution_notes')
+                        ->label('Resolution Notes')
                         ->rows(3)
                         ->columnSpanFull(),
                 ])
@@ -145,25 +163,21 @@ class TicketResource extends Resource
                 ),
                 Tables\Columns\TextColumn::make('priority')
                     ->badge()
-                    ->colors([
-                        'success' => 'low',
-                        'warning' => 'medium',
-                        'danger' => fn ($state) => in_array($state, [
-                            'high',
-                            'critical',
-                        ]),
-                    ]),
+                    ->formatStateUsing(fn (TicketPriority $state): string => $state->label())
+                    ->color(fn (TicketPriority $state): string => $state->color())
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        $direction = strtolower($direction) === 'desc' ? 'desc' : 'asc';
+                        $cases = collect(TicketPriority::cases());
+
+                        return $query->orderByRaw(
+                            'CASE priority'.$cases->map(fn () => ' WHEN ? THEN ?')->implode('').' END '.$direction,
+                            $cases->flatMap(fn (TicketPriority $p) => [$p->value, $p->sortOrder()])->all(),
+                        );
+                    }),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->colors([
-                        'warning' => 'open',
-                        'primary' => 'in-progress',
-                        'gray' => 'pending',
-                        'success' => fn ($state) => in_array($state, [
-                            'resolved',
-                            'closed',
-                        ]),
-                    ]),
+                    ->formatStateUsing(fn (TicketStatus $state): string => $state->label())
+                    ->color(fn (TicketStatus $state): string => $state->color()),
                 Tables\Columns\TextColumn::make('assignedTo.full_name')->label(
                     'Assigned To',
                 ),
@@ -176,18 +190,8 @@ class TicketResource extends Resource
                     ->date(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('status')->options([
-                    'open' => 'Open',
-                    'in-progress' => 'In Progress',
-                    'pending' => 'Pending',
-                    'resolved' => 'Resolved',
-                ]),
-                Tables\Filters\SelectFilter::make('priority')->options([
-                    'low' => 'Low',
-                    'medium' => 'Medium',
-                    'high' => 'High',
-                    'critical' => 'Critical',
-                ]),
+                Tables\Filters\SelectFilter::make('status')->options(TicketStatus::options()),
+                Tables\Filters\SelectFilter::make('priority')->options(TicketPriority::options()),
                 Tables\Filters\SelectFilter::make('school')
                     ->relationship('school', 'name')
                     ->searchable()

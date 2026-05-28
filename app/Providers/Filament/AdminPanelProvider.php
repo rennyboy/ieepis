@@ -22,6 +22,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -34,6 +35,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login()
             ->registration(Register::class)
+            ->profile(\App\Filament\Pages\Auth\EditProfile::class, isSimple: false)
             ->colors([
                 'primary' => [
                     50 => '#f0fdf4',
@@ -72,18 +74,13 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop(true)
             ->topNavigation(false)
             ->navigationGroups([
-                NavigationGroup::make('Overview'),
-                NavigationGroup::make('Management')->icon(
-                    'heroicon-o-building-office',
-                ),
-                NavigationGroup::make('ICT Inventory')->icon(
-                    'heroicon-o-computer-desktop',
-                ),
-                NavigationGroup::make('Monitoring')->icon(
-                    'heroicon-o-chart-bar',
-                ),
-                NavigationGroup::make('Reports & Tools')
-                    ->icon('heroicon-o-document-chart-bar')
+                NavigationGroup::make('Overview')->icon('heroicon-o-chart-pie'),
+                NavigationGroup::make('ICT Inventory')->icon('heroicon-o-computer-desktop'),
+                NavigationGroup::make('People')->icon('heroicon-o-users'),
+                NavigationGroup::make('Organization')->icon('heroicon-o-building-office-2'),
+                NavigationGroup::make('Documents & Tickets')->icon('heroicon-o-inbox-stack'),
+                NavigationGroup::make('Administration')
+                    ->icon('heroicon-o-shield-check')
                     ->collapsed(),
             ])
             ->discoverResources(
@@ -126,11 +123,8 @@ class AdminPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->globalSearch()
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
-            ->userMenuItems([
-                'profile' => \Filament\Navigation\MenuItem::make()->label(
-                    'My Profile',
-                ),
-            ])
+            // Filament's `->profile()` adds the "My Profile" link to the user
+            // menu automatically, so no manual entry needed here.
             ->renderHook(
                 'panels::auth.login.after',
                 fn() => view('auth.google-button-login'),
@@ -151,10 +145,15 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 'panels::topbar.end',
                 fn() => view('filament.widgets.navbar-user-widget', [
-                    'userName' => auth()->user()?->name ?? 'User',
-                    'userRole' => auth()->user()?->getRoleNames()->first() ?? 'User',
-                    'schoolName' => auth()->user()?->school?->name ?? null,
+                    'userName' => Auth::user()?->name ?? 'User',
+                    'userRole' => Auth::user()?->getRoleNames()->first() ?? 'User',
+                    'schoolName' => Auth::user()?->school?->name ?? null,
                 ]),
+            )
+            // ✅ PWA Meta Tags and Service Worker
+            ->renderHook(
+                'panels::head.end',
+                fn() => view('filament.pwa-head'),
             );
     }
 }

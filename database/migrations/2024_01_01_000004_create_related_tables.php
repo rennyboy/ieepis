@@ -10,21 +10,20 @@ return new class extends Migration {
         // Equipment Assignments
         Schema::create('equipment_assignments', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('school_id')->constrained()->restrictOnDelete();
             $table->foreignId('equipment_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('employee_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('new_accountable_id')->nullable()->constrained('employees')->nullOnDelete();
+            $table->foreignId('employee_id')->constrained()->restrictOnDelete();
             $table->foreignId('custodian_id')->nullable()->constrained('employees')->nullOnDelete();
+            $table->foreignId('assigned_by_id')->nullable()->constrained('users')->nullOnDelete();
             $table->date('assigned_at');
             $table->date('custodian_received_at')->nullable();
             $table->date('returned_at')->nullable();
-            $table->date('new_accountable_received_at')->nullable();
-            $table->string('assigned_by')->nullable();
             $table->string('transaction_type')->default('Issuance');
             $table->string('supporting_doc_type')->nullable();
             $table->string('supporting_doc_no')->nullable();
             $table->text('notes')->nullable();
-            $table->boolean('is_active')->default(true);
             $table->timestamps();
+            $table->softDeletes();
 
             $table->index(['equipment_id', 'returned_at']);
             $table->index(['employee_id', 'returned_at']);
@@ -33,7 +32,7 @@ return new class extends Migration {
         // Documents
         Schema::create('documents', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('school_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('school_id')->constrained()->restrictOnDelete();
             $table->foreignId('equipment_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('employee_id')->nullable()->constrained()->nullOnDelete();
             $table->string('document_type'); // PAR, ICS, IAR, DR, OR, SI, WMR, RRSP, RRPE
@@ -55,7 +54,7 @@ return new class extends Migration {
         // Tickets
         Schema::create('tickets', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('school_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('school_id')->constrained()->restrictOnDelete();
             $table->foreignId('equipment_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('reporter_id')->nullable()->constrained('employees')->nullOnDelete();
             $table->string('ticket_number')->unique();
@@ -77,7 +76,7 @@ return new class extends Migration {
         // Internet Connections
         Schema::create('internet_connections', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('school_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('school_id')->constrained()->restrictOnDelete();
             $table->string('isp');
             $table->string('account_number')->nullable();
             $table->string('plan_name')->nullable();

@@ -20,7 +20,7 @@ class ApprovedUserResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-check-badge';
 
-    protected static ?string $navigationGroup = 'Settings';
+    protected static ?string $navigationGroup = 'Administration';
 
     protected static ?string $navigationLabel = 'User Approvals';
 
@@ -35,8 +35,6 @@ class ApprovedUserResource extends Resource
                         ->email()
                         ->required()
                         ->unique(ignoreRecord: true),
-                    Forms\Components\TextInput::make('name')
-                        ->required(),
                     Forms\Components\Select::make('role')
                         ->options([
                             'division-admin' => 'Division Admin',
@@ -44,8 +42,6 @@ class ApprovedUserResource extends Resource
                             'technician' => 'Technician',
                         ])
                         ->required(),
-                    Forms\Components\TextInput::make('division')
-                        ->label('Division Name'),
                     Forms\Components\Select::make('status')
                         ->options([
                             'pending' => 'Pending',
@@ -67,11 +63,8 @@ class ApprovedUserResource extends Resource
                 Tables\Columns\TextColumn::make('email')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('name')
-                    ->searchable(),
                 Tables\Columns\TextColumn::make('role')
                     ->badge(),
-                Tables\Columns\TextColumn::make('division'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {

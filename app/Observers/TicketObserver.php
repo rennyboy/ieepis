@@ -2,6 +2,8 @@
 
 namespace App\Observers;
 
+use App\Enums\TicketPriority;
+use App\Enums\TicketStatus;
 use App\Models\Ticket;
 use App\Models\User;
 use App\Notifications\TicketResolvedNotification;
@@ -40,7 +42,7 @@ class TicketObserver
         }
 
         // If ticket was marked 'resolved', notify the school's admins that it's ready for pickup
-        if ($ticket->isDirty("status") && $ticket->status === "resolved") {
+        if ($ticket->isDirty("status") && $ticket->status === TicketStatus::Resolved) {
             $this->notifySchoolAboutResolved($ticket);
         }
     }
@@ -56,19 +58,10 @@ class TicketObserver
         Ticket $ticket,
         string $action = "created",
     ): void {
-        // Define priority levels and colors/labels
-        $priorities = [
-            "critical" => [
-                "color" => "danger",
-                "label" => "CRITICAL",
-                "order" => 1,
-            ],
-            "high" => ["color" => "warning", "label" => "HIGH", "order" => 2],
-            "medium" => ["color" => "info", "label" => "MEDIUM", "order" => 3],
-            "low" => ["color" => "gray", "label" => "LOW", "order" => 4],
-        ];
-
-        $priorityData = $priorities[$ticket->priority] ?? $priorities["medium"];
+        // priority is cast to the TicketPriority enum — use its own label()
+        // (the enum is the single source of truth; null-safe with a sane
+        // default in case priority is somehow unset).
+        $priorityLabel = ($ticket->priority ?? TicketPriority::Medium)->label();
 
         // Determine title based on action
         $title =
@@ -89,7 +82,7 @@ class TicketObserver
             ->get();
 
         // If no recipients and the ticket isn't resolved, nothing to do
-        if ($usersToNotify->isEmpty() && $ticket->status !== "resolved") {
+        if ($usersToNotify->isEmpty() && $ticket->status !== TicketStatus::Resolved) {
             return;
         }
 
@@ -97,7 +90,7 @@ class TicketObserver
         $recipients = $usersToNotify;
 
         // If ticket is resolved, also include the school's school-admin(s)
-        if ($ticket->status === "resolved" && $ticket->school_id) {
+        if ($ticket->status === TicketStatus::Resolved && $ticket->school_id) {
             $schoolAdmins = User::query()
                 ->where("school_id", $ticket->school_id)
                 ->whereHas("roles", function ($q) {
@@ -122,7 +115,7 @@ class TicketObserver
         FilamentNotification::make()
             ->title($title)
             ->body(
-                "**Priority: {$priorityData["label"]}**\n\nIssue: {$ticket->issue_title}\nSchool: {$ticket->school->name}",
+                "**Priority: {$priorityLabel}**\n\nIssue: {$ticket->issue_title}\nSchool: {$ticket->school->name}",
             )
             ->icon("heroicon-o-ticket")
             ->actions([
@@ -142,7 +135,7 @@ class TicketObserver
         try {
             // Only send email if the TicketResolvedNotification exists; sending will fail otherwise.
             // For 'updated' events we may still want to email depending on priority; currently we email for resolved.
-            if ($ticket->status === "resolved") {
+            if ($ticket->status === TicketStatus::Resolved) {
                 NotificationFacade::send(
                     $recipients,
                     new TicketResolvedNotification($ticket),

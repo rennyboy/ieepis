@@ -1,0 +1,10 @@
+# Keep Cursor's index light — exclude build output and Laravel runtime dirs.
+# SecondBrain/ is intentionally NOT excluded so Cursor can grep prompts, decisions, learnings.
+.obsidian/
+.git/
+node_modules/
+vendor/
+public/build/
+storage/logs/
+storage/framework/
+bootstrap/cache/

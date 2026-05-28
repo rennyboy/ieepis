@@ -3,11 +3,16 @@
 namespace App\Models;
 
 use App\Scopes\SchoolScope;
+use App\Enums\DocumentType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Spatie\Activitylog\Traits\LogsActivity;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
+use App\Enums\TransactionType;
 
 /**
  * EquipmentAssignment Model
@@ -16,55 +21,50 @@ use Spatie\Activitylog\LogOptions;
  * @property int $school_id
  * @property int $equipment_id
  * @property int $employee_id
- * @property int|null $new_accountable_id
  * @property int|null $custodian_id
+ * @property int|null $assigned_by_id
  * @property \Carbon\Carbon $assigned_at
  * @property \Carbon\Carbon|null $custodian_received_at
  * @property \Carbon\Carbon|null $returned_at
- * @property \Carbon\Carbon|null $new_accountable_received_at
- * @property string|null $assigned_by
  * @property string $transaction_type
  * @property string|null $supporting_doc_type
  * @property string|null $supporting_doc_no
  * @property string|null $notes
- * @property bool $is_active
  * @property \Carbon\Carbon|null $created_at
  * @property \Carbon\Carbon|null $updated_at
+ * @property \Carbon\Carbon|null $deleted_at
  *
  * @method BelongsTo school()
  * @method BelongsTo equipment()
  * @method BelongsTo employee()
- * @method BelongsTo newAccountable()
  * @method BelongsTo custodian()
+ * @method BelongsTo assignedBy()
+ * @method HasMany documents()
  */
 class EquipmentAssignment extends Model
 {
-    use HasFactory, LogsActivity;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $fillable = [
-        "school_id",
-        "equipment_id",
-        "employee_id",
-        "new_accountable_id",
-        "custodian_id",
-        "assigned_at",
-        "custodian_received_at",
-        "returned_at",
-        "new_accountable_received_at",
-        "assigned_by",
-        "transaction_type",
-        "supporting_doc_type",
-        "supporting_doc_no",
-        "notes",
-        "is_active",
+        'school_id',
+        'equipment_id',
+        'employee_id',
+        'custodian_id',
+        'assigned_by_id',
+        'assigned_at',
+        'custodian_received_at',
+        'returned_at',
+        'transaction_type',
+        'supporting_doc_type',
+        'supporting_doc_no',
+        'notes',
     ];
 
     protected $casts = [
-        "assigned_at" => "date",
-        "custodian_received_at" => "date",
-        "returned_at" => "date",
-        "new_accountable_received_at" => "date",
-        "is_active" => "boolean",
+        'assigned_at' => 'date',
+        'custodian_received_at' => 'date',
+        'returned_at' => 'date',
+        'transaction_type' => TransactionType::class,
     ];
 
     protected static function booted(): void
@@ -75,6 +75,16 @@ class EquipmentAssignment extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()->logAll();
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->whereNull('returned_at');
+    }
+
+    public function isActive(): bool
+    {
+        return $this->returned_at === null;
     }
 
     /**
@@ -104,16 +114,48 @@ class EquipmentAssignment extends Model
     /**
      * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\Employee, self>
      */
-    public function newAccountable(): BelongsTo
+    public function custodian(): BelongsTo
     {
-        return $this->belongsTo(Employee::class, "new_accountable_id");
+        return $this->belongsTo(Employee::class, 'custodian_id');
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\Employee, self>
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\User, self>
      */
-    public function custodian(): BelongsTo
+    public function assignedBy(): BelongsTo
     {
-        return $this->belongsTo(Employee::class, "custodian_id");
+        return $this->belongsTo(User::class, 'assigned_by_id');
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Document>
+     */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
+    }
+
+    public function issuanceDocument(): ?Document
+    {
+        $type = $this->supporting_doc_type
+            ? DocumentType::tryFrom($this->supporting_doc_type)
+            : DocumentType::ICS;
+
+        $type ??= DocumentType::ICS;
+
+        if ($this->relationLoaded('documents')) {
+            return $this->documents->firstWhere('document_type', $type);
+        }
+
+        return $this->documents()->where('document_type', $type)->latest()->first();
+    }
+
+    public function returnDocument(): ?Document
+    {
+        if ($this->relationLoaded('documents')) {
+            return $this->documents->firstWhere('document_type', DocumentType::RRSP);
+        }
+
+        return $this->documents()->where('document_type', DocumentType::RRSP)->latest()->first();
     }
 }

@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('maintenance_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('equipment_id')->constrained('equipment')->cascadeOnDelete();
-            $table->foreignId('technician_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('equipment_id')->constrained('equipment')->restrictOnDelete();
+            $table->foreignId('technician_id')->nullable()->constrained('users')->nullOnDelete();
             
             $table->text('issue_description');
             $table->text('action_taken');

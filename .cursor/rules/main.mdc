@@ -1,0 +1,14 @@
+---
+description: Universal session protocol pointer
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# Main Rule
+
+Read `AGENTS.md` at the workspace root. It contains the full session protocol (handoff → memory → role), token-saving rules, and agent role map. Follow it.
+
+Agent roles: `.agents/architect.md`, `debugger.md`, `refactor.md`, `pm.md`, `reviewer.md`, `assistant.md`, `scheduler.md`, `reminder.md`.
+
+Repo memory: `.ai/handoff.md` (always read first), `.ai/memory.md` (indexed — scoped reads only).

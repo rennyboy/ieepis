@@ -22,7 +22,7 @@ class SchoolResource extends Resource
 {
     protected static ?string $model = School::class;
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
-    protected static ?string $navigationGroup = 'Management';
+    protected static ?string $navigationGroup = 'Organization';
     protected static ?int $navigationSort = 1;
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -143,7 +143,7 @@ class SchoolResource extends Resource
                 Tables\Columns\TextColumn::make('equipment_count')
                     ->label('Equipment')
                     ->badge()->color('primary')
-                    ->getStateUsing(fn (School $record) => $record->equipment()->count()),
+                    ->counts('equipment'),
                 Tables\Columns\TextColumn::make('employees_count')
                     ->label('Personnel')
                     ->badge()->color('warning')
@@ -232,6 +232,14 @@ class SchoolResource extends Resource
 
         if ($action === 'create') {
             return $user->hasRole(['super-admin', 'division-admin']);
+        }
+
+        // School-admins may view/edit their own school but never delete a
+        // school record (row Delete and bulk Delete are gated through can()).
+        if ($user->hasRole('school-admin') && in_array($action, [
+            'delete', 'deleteAny', 'forceDelete', 'forceDeleteAny', 'restore', 'restoreAny',
+        ], true)) {
+            return false;
         }
 
         return parent::can($action, $record);

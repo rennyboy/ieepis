@@ -9,10 +9,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use App\Enums\AccountabilityStatus;
+use App\Enums\EquipmentCondition;
+use App\Enums\TransactionType;
 
 class Equipment extends Model
 {
@@ -20,6 +22,8 @@ class Equipment extends Model
 
     protected $fillable = [
         "school_id",
+        "accountable_officer_id",
+        "document_id",
         "property_no",
         "old_property_no",
         "serial_number",
@@ -72,6 +76,9 @@ class Equipment extends Model
         "is_non_dcp" => "boolean",
         "under_warranty" => "boolean",
         "is_functional" => "boolean",
+        "accountability_status" => AccountabilityStatus::class,
+        "condition" => EquipmentCondition::class,
+        "transaction_type" => TransactionType::class,
     ];
 
     public function getActivitylogOptions(): LogOptions
@@ -111,6 +118,27 @@ class Equipment extends Model
     }
 
     /**
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\Document, self>
+     */
+    public function document(): BelongsTo
+    {
+        return $this->belongsTo(Document::class);
+    }
+
+    /**
+     * The property-accountable officer (PAR/ICS holder), established at
+     * acquisition/delivery — distinct from the rotating custodian/end-user
+     * tracked per EquipmentAssignment. Changes here are audited via
+     * LogsActivity (property transfers).
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo<\App\Models\Employee, self>
+     */
+    public function accountableOfficer(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'accountable_officer_id');
+    }
+
+    /**
      * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\EquipmentAssignment>
      */
     public function assignments(): HasMany
@@ -129,26 +157,29 @@ class Equipment extends Model
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\HasOneThrough<\App\Models\Employee>
-     */
-    public function accountableOfficer(): HasOneThrough
-    {
-        return $this->hasOneThrough(
-            Employee::class,
-            EquipmentAssignment::class,
-            "equipment_id",
-            "id",
-            "id",
-            "employee_id",
-        );
-    }
-
-    /**
      * @return \Illuminate\Database\Eloquent\Relations\HasMany<\App\Models\Document>
      */
     public function documents(): HasMany
     {
         return $this->hasMany(Document::class);
+    }
+
+    /**
+     * Most-recent document with a file attached to this equipment, ordered by document_date then created_at.
+     * Returns null when no documents with files exist.
+     */
+    public function sharedDocument(): ?Document
+    {
+        return $this->documents()
+            ->whereNotNull('file_path')
+            ->orderByDesc("document_date")
+            ->orderByDesc("created_at")
+            ->first();
+    }
+
+    public function hasSharedDocument(): bool
+    {
+        return $this->documents()->whereNotNull('file_path')->exists();
     }
 
     /**
@@ -194,7 +225,10 @@ class Equipment extends Model
 
     public function getCurrentAccountableAttribute(): ?Employee
     {
-        return $this->activeAssignment?->employee;
+        // Accountability now lives on the equipment itself (set at delivery),
+        // not the assignment. Fall back to legacy assignment data for rows not
+        // yet backfilled (expand/contract — employee_id kept until contracted).
+        return $this->accountableOfficer ?? $this->activeAssignment?->employee;
     }
 
     public function getWarrantyStatusAttribute(): string

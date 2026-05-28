@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Models\School;
+use App\Models\Equipment;
 use App\Models\Employee;
+use App\Models\School;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -21,15 +22,22 @@ class DatabaseSeeder extends Seeder
         Role::firstOrCreate(["name" => "technician", "guard_name" => "web"]);
 
         // ── 2. Create the Super Admin
+        $adminPassword = app()->environment('local')
+            ? 'P@ssw0rd123'
+            : (env('SEED_SUPER_ADMIN_PASSWORD') ?: Str::random(24));
+
         $adminUser = User::firstOrCreate(
-            ["email" => "admin@deped.gov.ph"],
+            ['email' => 'admin@deped.gov.ph'],
             [
-                "name" => "System Administrator",
-                "password" => Hash::make("P@ssw0rd123"),
-                "approval_status" => "approved",
+                'password' => Hash::make($adminPassword),
+                'approval_status' => 'approved',
             ]
         );
-        $adminUser->assignRole("super-admin");
+        $adminUser->assignRole('super-admin');
+
+        if (! app()->environment('local')) {
+            $this->command->warn("Super admin password (capture now, will not repeat): {$adminPassword}");
+        }
 
         // ── 3. Parse the CSV file from the root directory
         $csvPath = base_path("LIST OF EMPLOYEES 03.09.csv");
@@ -90,17 +98,15 @@ class DatabaseSeeder extends Seeder
                         'date_hired' => now(),
                     ];
 
-                    $employee = Employee::create($employeeData);
-
-                    // ── Create User Account for the Submitter
                     $user = User::create([
-                        'name' => $submittedBy,
-                        'email' => $employee->email,
-                        'password' => Hash::make('password'),
-                        'school_id' => $school->id,
+                        'email' => $employeeData['email'],
+                        'password' => Hash::make(Str::random(20)),
                         'approval_status' => 'approved',
                     ]);
                     $user->assignRole('school-admin');
+
+                    $employeeData['user_id'] = $user->id;
+                    Employee::create($employeeData);
                 }
 
                 $count++;
@@ -108,6 +114,39 @@ class DatabaseSeeder extends Seeder
             fclose($handle);
             $this->command->info("✅ Seeded {$count} schools and their admin staff.");
         }
+
+        $this->seedEquipment();
+    }
+
+    private function seedEquipment(): void
+    {
+        $brands = ['Lenovo', 'Acer', 'Dell', 'HP'];
+        $types = ['Laptop', 'Desktop', 'TV', 'Router'];
+        $totalEquipment = 0;
+
+        foreach (School::all() as $school) {
+            foreach ($types as $type) {
+                for ($i = 0; $i < 3; $i++) {
+                    Equipment::create([
+                        'school_id' => $school->id,
+                        'property_no' => 'PROP-' . Str::upper(Str::random(10)),
+                        'serial_number' => 'SER-' . Str::upper(Str::random(10)),
+                        'item_type' => $type,
+                        'equipment_type' => $type,
+                        'brand' => $brands[array_rand($brands)],
+                        'model' => "{$type}-2026",
+                        'is_dcp' => true,
+                        'dcp_package' => 'Batch 2026',
+                        'accountability_status' => 'unassigned',
+                        'is_functional' => true,
+                        'condition' => 'Good',
+                    ]);
+                    $totalEquipment++;
+                }
+            }
+        }
+
+        $this->command->info("✅ Seeded {$totalEquipment} equipment items across schools.");
     }
 
     /**

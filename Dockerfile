@@ -1,71 +1,105 @@
-FROM php:8.4-fpm
+# syntax=docker/dockerfile:1.6
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    nginx \
-    supervisor \
-    mariadb-client \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    libzip-dev \
-    zip \
-    unzip \
-    libicu-dev \
+# ---- Stage 1: Build front-end assets with Vite ----
+FROM node:20-alpine AS assets
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci --no-audit --no-fund
+COPY vite.config.js postcss.config.js tailwind.config.js* ./
+COPY resources ./resources
+COPY public ./public
+RUN npm run build
+
+# ---- Stage 2: PHP-FPM application ----
+FROM php:8.4-fpm AS app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        curl \
+        libpng-dev \
+        libonig-dev \
+        libxml2-dev \
+        libzip-dev \
+        zip \
+        unzip \
+        libicu-dev \
+        libpq-dev \
+        postgresql-client \
+        libfcgi-bin \
+        procps \
     && docker-php-ext-configure intl \
-    && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip intl \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && docker-php-ext-install pdo_pgsql mbstring exif pcntl bcmath gd zip intl \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Composer
+# OPcache enabled with development-friendly file validation (revalidates on change)
+RUN { \
+        echo "memory_limit=512M"; \
+        echo "upload_max_filesize=64M"; \
+        echo "post_max_size=64M"; \
+        echo "max_execution_time=300"; \
+        echo "opcache.enable=1"; \
+        echo "opcache.memory_consumption=192"; \
+        echo "opcache.interned_strings_buffer=16"; \
+        echo "opcache.max_accelerated_files=20000"; \
+        echo "opcache.validate_timestamps=1"; \
+        echo "opcache.revalidate_freq=0"; \
+        echo "opcache.fast_shutdown=1"; \
+    } > /usr/local/etc/php/conf.d/zz-opcache.ini
+
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www
 
-# Copy composer files first for better caching
+# Install PHP deps with cached layer.
+# INSTALL_DEV=true keeps dev packages (telescope, debugbar, faker) for local containers.
+ARG INSTALL_DEV=false
 COPY composer.json composer.lock ./
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+        composer install --optimize-autoloader --no-scripts --no-interaction --prefer-dist; \
+    else \
+        composer install --no-dev --optimize-autoloader --no-scripts --no-interaction --prefer-dist; \
+    fi
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-scripts --ignore-platform-reqs
-
-# Copy application files
+# Copy application source
 COPY . .
 
-# Run post-install scripts
-RUN composer dump-autoload --optimize
+# Drop in the built assets from the Node stage
+COPY --from=assets /app/public/build ./public/build
 
-# Copy Nginx configuration
-RUN rm -f /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*
-COPY docker/nginx/default.conf /etc/nginx/sites-available/default
-RUN ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+# Bake the storage symlink so it exists in any image derived from this stage
+RUN ln -sfn /var/www/storage/app/public /var/www/public/storage
 
-# Copy Supervisor configuration
-RUN mkdir -p /etc/supervisor/conf.d
-COPY docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+# Finalize autoload (runs package:discover + filament:upgrade via post-autoload-dump).
+# Match the install flavor so the classmap stays consistent.
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+        composer dump-autoload --optimize; \
+    else \
+        composer dump-autoload --optimize --no-dev; \
+    fi
 
-# Create necessary directories for Supervisor
-RUN mkdir -p /var/log/supervisor /var/run/supervisor
-
-# Copy entrypoint script
+# Entrypoint
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Set permissions
+# Permissions
 RUN chown -R www-data:www-data /var/www \
-    && chmod -R 775 /var/www/storage \
-    && chmod -R 775 /var/www/bootstrap/cache
+    && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
 
-# Create .env if it doesn't exist
-RUN if [ ! -f .env ]; then cp .env.example .env 2>/dev/null || true; fi
-
-# Expose HTTP port for Render
-EXPOSE 8080
-
-# Health check endpoint
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
-
-# Use entrypoint script to initialize and start services
+EXPOSE 9000
 ENTRYPOINT ["/entrypoint.sh"]
+CMD ["php-fpm"]
+
+# ---- Stage 3: Nginx web server (separate image, same source) ----
+FROM nginx:stable-alpine AS web
+
+# Static assets and the public directory (with the storage symlink baked in)
+COPY --from=app /var/www/public /var/www/public
+COPY docker/nginx/prod.conf /etc/nginx/conf.d/default.conf
+
+# Allow nginx to follow the public/storage symlink into a mounted volume
+RUN apk add --no-cache curl
+
+EXPOSE 80

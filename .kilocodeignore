@@ -1,0 +1,10 @@
+# Keep Kilo's context window for code and memory, not build output.
+# SecondBrain/ is intentionally NOT excluded so Kilo can grep prompts, decisions, learnings.
+.obsidian/
+.git/
+node_modules/
+vendor/
+public/build/
+storage/logs/
+storage/framework/
+bootstrap/cache/
