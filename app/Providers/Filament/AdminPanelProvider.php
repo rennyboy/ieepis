@@ -146,7 +146,7 @@ class AdminPanelProvider extends PanelProvider
                 'panels::topbar.end',
                 fn() => view('filament.widgets.navbar-user-widget', [
                     'userName' => Auth::user()?->name ?? 'User',
-                    'userRole' => Auth::user()?->getRoleNames()->first() ?? 'User',
+                    'userRole' => Auth::user()?->getRoleName() ?? 'User',
                     'schoolName' => Auth::user()?->school?->name ?? null,
                 ]),
             )

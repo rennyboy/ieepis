@@ -112,4 +112,9 @@ class User extends Authenticatable implements FilamentUser
     {
         return $this->approval_status === 'approved';
     }
+
+    public function getRoleName(): string
+    {
+        return $this->getRoleNames()->first() ?? 'User';
+    }
 }
