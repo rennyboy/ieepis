@@ -177,9 +177,9 @@ class EmployeeResource extends Resource
                     ->label('Name')
                     ->searchable(query: function ($query, string $search) {
                         return $query
-                            ->whereRaw('first_name like ?', ["%{$search}%"])
-                            ->orWhereRaw('last_name like ?', ["%{$search}%"])
-                            ->orWhereRaw('middle_name like ?', ["%{$search}%"]);
+                            ->whereRaw('first_name ILIKE ?', ["%{$search}%"])
+                            ->orWhereRaw('last_name ILIKE ?', ["%{$search}%"])
+                            ->orWhereRaw('middle_name ILIKE ?', ["%{$search}%"]);
                     })
                     ->sortable()
                     ->weight('bold'),

@@ -85,9 +85,7 @@ class User extends Authenticatable implements FilamentUser
 
     public function getSchoolIdAttribute(): ?int
     {
-        return array_key_exists('school_id', $this->attributes)
-            ? $this->attributes['school_id']
-            : ($this->employee?->school_id ?? null);
+        return $this->attributes['school_id'] ?? ($this->employee?->school_id ?? null);
     }
 
     public function getDivisionIdAttribute(): ?int
