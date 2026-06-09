@@ -6,6 +6,8 @@ use App\Http\Controllers\EmployeePdfController;
 use App\Http\Controllers\EquipmentExcelController;
 use App\Http\Controllers\EquipmentPdfController;
 use App\Http\Controllers\DcpPdfController;
+use App\Http\Controllers\PpePhysicalCountPdfController;
+use App\Http\Controllers\PpePhysicalCountExcelController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -63,4 +65,10 @@ Route::middleware(['auth', 'role:super-admin|sdo-admin|school-admin'])->group(fu
 
     Route::post('equipment/offline/sync', [\App\Http\Controllers\OfflineEquipmentController::class, 'store'])
         ->name('equipment.offline.sync');
+
+    Route::get('ppe-physical-count/pdf/{ppePhysicalCount}', [PpePhysicalCountPdfController::class, 'generate'])
+        ->name('ppe-physical-count.pdf');
+
+    Route::get('ppe-physical-count/excel/{ppePhysicalCount}', [PpePhysicalCountExcelController::class, 'export'])
+        ->name('ppe-physical-count.excel');
 });

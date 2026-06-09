@@ -17,15 +17,6 @@
 - [ ] Equipment transfer wizard (multi-step + auto document)
 - [ ] Audit report export (COA-compliant Excel/PDF)
 
-## Backlog (P3)
-- [ ] Speed test widget on connectivity page
-- [ ] Mobile API surface
-- [ ] SMS notifications (Semaphore/Globe)
-- [ ] Interactive school map
-- [ ] PSGC sync for barangay/municipality codes
-- [ ] Wire `ReassignmentAudit` to a Resource
-- [ ] Move `LIST OF EMPLOYEES 03.09.csv` out of repo root (import via seeder, then archive)
-- [ ] Archive legacy `*_DEPLOYMENT*.md` / completion docs into `docs/`
-
 ## Done
+- [x] PPE Physical Count module (draft, completion, local approval flow, exports, tests)
 - See root `TASKS.md` `## ✅ Completed` section

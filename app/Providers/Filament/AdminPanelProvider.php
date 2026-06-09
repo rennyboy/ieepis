@@ -76,6 +76,7 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make('Overview')->icon('heroicon-o-chart-pie'),
                 NavigationGroup::make('ICT Inventory')->icon('heroicon-o-computer-desktop'),
+                NavigationGroup::make('PPE Module')->icon('heroicon-o-clipboard-document-list'),
                 NavigationGroup::make('People')->icon('heroicon-o-users'),
                 NavigationGroup::make('Organization')->icon('heroicon-o-building-office-2'),
                 NavigationGroup::make('Documents & Tickets')->icon('heroicon-o-inbox-stack'),
